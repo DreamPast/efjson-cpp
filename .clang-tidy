@@ -1,0 +1,15 @@
+Checks: |
+  *
+  -llvmlibc-*
+  -readability-*
+  -altera-id-dependent-backward-branch
+  -altera-unroll-loops
+  -bugprone-assignment-in-if-condition
+  -bugprone-easily-swappable-parameters
+  -cppcoreguidelines-avoid-magic-numbers
+  -google-readability-braces-around-statements
+  -hicpp-braces-around-statements
+  -hicpp-uppercase-literal-suffix
+  -llvm-else-after-return
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+  -hicpp-signed-bitwise
