@@ -115,11 +115,17 @@ typedef unsigned efjsonStackLength;
   #define ul_unlikely(x) (x)
 #endif /* ul_unlikely */
 
+#ifdef __cplusplus
+  #define EFJSON_EXTERN_C extern "C"
+#else
+  #define EFJSON_EXTERN_C
+#endif
+
 #ifndef EFJSON_PUBLIC
-  #define EFJSON_PUBLIC
+  #define EFJSON_PUBLIC EFJSON_EXTERN_C
 #endif
 #ifndef EFJSON_PRIVATE
-  #define EFJSON_PRIVATE static
+  #define EFJSON_PRIVATE EFJSON_EXTERN_C static
 #endif
 
 
@@ -203,11 +209,24 @@ typedef unsigned efjsonStackLength;
   #define EFJSON_CONF_CHECK_SIZET_OVERFLOW 0
 #endif
 
+/**
+ * Configuration: Whether to expose some Unicode APIs
+ */
+#ifndef EFJSON_CONF_EXPOSE_UNICODE
+  #define EFJSON_CONF_EXPOSE_UNICODE 1
+#endif
 
-EFJSON_PUBLIC int efjson_isWhitespace(efjsonUint32 u, int fitJson5);
-EFJSON_PUBLIC int efjson_isIdentifierStart(efjsonUint32 u);
-EFJSON_PUBLIC int efjson_isIdentifierNext(efjsonUint32 u);
-EFJSON_PUBLIC int efjson_isGraph(efjsonUint32 u);
+
+#if EFJSON_CONF_EXPOSE_UNICODE
+  #define EFJSON_UAPI EFJSON_PUBLIC
+/* this function is not used by this library; it is only provided to help improve error messages */
+EFJSON_UAPI int efjson_isGraph(efjsonUint32 u);
+#else
+  #define EFJSON_UAPI EFJSON_PRIVATE
+#endif
+EFJSON_UAPI int efjson_isWhitespace(efjsonUint32 u, int fitJson5);
+EFJSON_UAPI int efjson_isIdentifierStart(efjsonUint32 u);
+EFJSON_UAPI int efjson_isIdentifierNext(efjsonUint32 u);
 
 
 #if EFJSON_CONF_UTF_ENCODER
@@ -981,6 +1000,7 @@ EFJSON_PRIVATE const efjsonUint16 EFJSON__IDENTIFIER_NEXT_DELTA2[][2] = {
 };
 EFJSON_PRIVATE const efjsonUint32 EFJSON__IDENTIFIER_NEXT_DELTA3[][2] = { { 0xE0100, 0xE01EF } };
 
+    #if EFJSON_CONF_EXPOSE_UNICODE
 EFJSON_PRIVATE const efjsonUint16 EFJSON__GRAPH1[][2] = {
   { 0x0020, 0x007E }, { 0x00A0, 0x00AC }, { 0x00AE, 0x0377 }, { 0x037A, 0x037F }, { 0x0384, 0x038A },
   { 0x038C, 0x038C }, { 0x038E, 0x03A1 }, { 0x03A3, 0x052F }, { 0x0531, 0x0556 }, { 0x0559, 0x058A },
@@ -1135,6 +1155,7 @@ EFJSON_PRIVATE const efjsonUint32 EFJSON__GRAPH3[][2] = {
   { 0x20000, 0x2A6DF }, { 0x2A700, 0x2B739 }, { 0x2B740, 0x2B81D }, { 0x2B820, 0x2CEA1 }, { 0x2CEB0, 0x2EBE0 },
   { 0x2EBF0, 0x2EE5D }, { 0x2F800, 0x2FA1D }, { 0x30000, 0x3134A }, { 0x31350, 0x323AF }, { 0xE0100, 0xE01EF }
 };
+    #endif
 
 EFJSON_PRIVATE int efjson__lookupTable16(efjsonUint16 u, const efjsonUint16 table[][2], unsigned size) {
   unsigned l = 0, r = size;
@@ -1152,7 +1173,7 @@ EFJSON_PRIVATE int efjson__lookupTable32(efjsonUint32 u, const efjsonUint32 tabl
   return 0;
 }
 
-EFJSON_PUBLIC int efjson_isWhitespace(efjsonUint32 u, int fitJson5) {
+EFJSON_UAPI int efjson_isWhitespace(efjsonUint32 u, int fitJson5) {
   if(u == 0x20 || u == 0x09 || u == 0x0A || u == 0x0D) return 1;
   if(ul_unlikely(fitJson5)) {
     unsigned idx = sizeof(EFJSON__EXTRA_WHITESPACE) / sizeof(efjsonUint16);
@@ -1161,7 +1182,7 @@ EFJSON_PUBLIC int efjson_isWhitespace(efjsonUint32 u, int fitJson5) {
   }
   return 0;
 }
-EFJSON_PUBLIC int efjson_isIdentifierStart(efjsonUint32 u) {
+EFJSON_UAPI int efjson_isIdentifierStart(efjsonUint32 u) {
   if(ul_likely(u <= 0xFFFFu))
     return efjson__lookupTable16(
       efjson_cast(efjsonUint16, u), EFJSON__IDENTIFIER_START1,
@@ -1178,7 +1199,7 @@ EFJSON_PUBLIC int efjson_isIdentifierStart(efjsonUint32 u) {
       sizeof(EFJSON__IDENTIFIER_START3) / sizeof(EFJSON__IDENTIFIER_START3[0])
     );
 }
-EFJSON_PUBLIC int efjson_isIdentifierNext(efjsonUint32 u) {
+EFJSON_UAPI int efjson_isIdentifierNext(efjsonUint32 u) {
   if(ul_likely(u <= 0xFFFFu)) {
     return efjson__lookupTable16(
              efjson_cast(efjsonUint16, u), EFJSON__IDENTIFIER_START1,
@@ -1207,7 +1228,8 @@ EFJSON_PUBLIC int efjson_isIdentifierNext(efjsonUint32 u) {
            );
   }
 }
-EFJSON_PUBLIC int efjson_isGraph(efjsonUint32 u) {
+    #if EFJSON_CONF_EXPOSE_UNICODE
+EFJSON_UAPI int efjson_isGraph(efjsonUint32 u) {
   if(ul_likely(u <= 0xFFFFu))
     return efjson__lookupTable16(
       efjson_cast(efjsonUint16, u), EFJSON__GRAPH1, sizeof(EFJSON__GRAPH1) / sizeof(EFJSON__GRAPH1[0])
@@ -1221,20 +1243,23 @@ EFJSON_PUBLIC int efjson_isGraph(efjsonUint32 u) {
       efjson_cast(efjsonUint32, u), EFJSON__GRAPH3, sizeof(EFJSON__GRAPH3) / sizeof(EFJSON__GRAPH3[0])
     );
 }
+    #endif
   #else
-EFJSON_PUBLIC int efjson_isWhitespace(efjsonUint32 u, int fitJson5) {
+EFJSON_UAPI int efjson_isWhitespace(efjsonUint32 u, int fitJson5) {
   (void)fitJson5;
   return u == 0x20 || u == 0x09 || u == 0x0A || u == 0x0D;
 }
-EFJSON_PUBLIC int efjson_isIdentifierStart(efjsonUint32 u) {
+EFJSON_UAPI int efjson_isIdentifierStart(efjsonUint32 u) {
   return u == 0x5F || u == 0x24 || (u >= 0x61 && u <= 0x7A) || (u >= 0x41 && u <= 0x5A);
 }
-EFJSON_PUBLIC int efjson_isIdentifierNext(efjsonUint32 u) {
+EFJSON_UAPI int efjson_isIdentifierNext(efjsonUint32 u) {
   return efjson_isIdentifierStart(u) || (u >= 0x30 && u <= 0x39);
 }
-EFJSON_PUBLIC int efjson_isGraph(efjsonUint32 u) {
+    #if EFJSON_CONF_EXPOSE_UNICODE
+EFJSON_UAPI int efjson_isGraph(efjsonUint32 u) {
   return u >= 0x20 && u < 0x7F;
 }
+    #endif
   #endif
 
 

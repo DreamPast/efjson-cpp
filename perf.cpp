@@ -1,5 +1,6 @@
 #define EFJSON_CONF_FIXED_STACK 2000000
-#include "efjson.hpp"
+#define EFJSON_STREAM_IMPL
+#include "efjson_stream.h"
 
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
@@ -62,7 +63,6 @@ int main() {
                   auto parser = efjsonStreamParser_new(0);
                   for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
                   efjsonStreamParser_feedOne(parser, 0);
-                  efjsonStreamParser_deinit(parser);
                   efjsonStreamParser_destroy(parser);
                 }));
   }
@@ -72,7 +72,6 @@ int main() {
                   auto parser = efjsonStreamParser_new(0);
                   for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
                   efjsonStreamParser_feedOne(parser, 0);
-                  efjsonStreamParser_deinit(parser);
                   efjsonStreamParser_destroy(parser);
                 }));
   }
@@ -82,7 +81,6 @@ int main() {
                   auto parser = efjsonStreamParser_new(0);
                   for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
                   efjsonStreamParser_feedOne(parser, 0);
-                  efjsonStreamParser_deinit(parser);
                   efjsonStreamParser_destroy(parser);
                 }));
   }
