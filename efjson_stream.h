@@ -580,9 +580,7 @@ EFJSON_PUBLIC enum efjsonStage efjsonStreamParser_getStage(const efjsonStreamPar
 #ifdef EFJSON_STREAM_IMPL
   #include <assert.h>
   #include <string.h>
-  #if !(EFJSON_CONF_FIXED_STACK > 0)
-    #include <stdlib.h>
-  #endif
+  #include <stdlib.h>
 
   #ifdef __cplusplus
     #define efjson_cast(T, v) (static_cast<T>(v))
