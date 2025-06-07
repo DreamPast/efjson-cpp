@@ -553,6 +553,8 @@ EFJSON_PUBLIC void efjsonStreamParser_init(efjsonStreamParser* parser, efjsonUin
 EFJSON_PUBLIC void efjsonStreamParser_deinit(efjsonStreamParser* parser);
 EFJSON_PUBLIC int(efjsonStreamParser_initCopy)(efjsonStreamParser* parser, const efjsonStreamParser* src);
 EFJSON_PUBLIC void(efjsonStreamParser_initMove)(efjsonStreamParser* parser, efjsonStreamParser* src);
+EFJSON_PUBLIC efjsonStreamParser* efjsonStreamParser_newCopy(const efjsonStreamParser* src);
+
 EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser, efjsonUint32 u);
 /* note: if the string ends, remember to pass EOF to parser */
 EFJSON_PUBLIC efjsonStackLength
@@ -2256,26 +2258,43 @@ EFJSON_PUBLIC void efjsonStreamParser_destroy(efjsonStreamParser* parser) {
   free(parser);
 }
 EFJSON_PUBLIC int(efjsonStreamParser_initCopy)(efjsonStreamParser* parser, const efjsonStreamParser* src) {
-  #if EFJSON_CONF_FIXED_STACK > 0
-  if(parser != src) memcpy(parser, src, sizeof(efjsonStreamParser));
-  #else
   if(parser != src) {
+  #if EFJSON_CONF_FIXED_STACK > 0
+    memcpy(parser, src, sizeof(efjsonStreamParser));
+  #else
     efjsonUint8* stack = (efjsonUint8*)malloc(efjson_cast(efjsonStackLength, parser->cap));
     if(ul_unlikely(!stack)) return -1;
     memcpy(parser, src, sizeof(efjsonStreamParser));
     parser->stack = stack;
-  }
   #endif
+  }
   return 0;
 }
 EFJSON_PUBLIC void(efjsonStreamParser_initMove)(efjsonStreamParser* parser, efjsonStreamParser* src) {
-  if(parser != src) memcpy(parser, src, sizeof(efjsonStreamParser));
+  if(parser != src) {
+    memcpy(parser, src, sizeof(efjsonStreamParser));
   #if !(EFJSON_CONF_FIXED_STACK > 0)
-  src->stack = NULL;
-  parser->len = 0;
-  src->cap = 0;
+    src->stack = NULL;
+    parser->len = 0;
+    src->cap = 0;
   #endif
+  }
 }
+EFJSON_PUBLIC efjsonStreamParser* efjsonStreamParser_newCopy(const efjsonStreamParser* src) {
+  efjsonStreamParser* parser = efjson_reptr(efjsonStreamParser*, malloc(sizeof(efjsonStreamParser)));
+  if(ul_likely(parser != NULL)) {
+  #if EFJSON_CONF_FIXED_STACK > 0
+    memcpy(parser, src, sizeof(efjsonStreamParser));
+  #else
+    if(ul_unlikely(efjsonStreamParser_initCopy(parser, src) < 0)) {
+      free(parser);
+      return NULL;
+    }
+  #endif
+  }
+  return parser;
+}
+
 EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser, efjsonUint32 u) {
   efjsonToken token;
   #if EFJSON_CONF_CHECK_POSITION_OVERFLOW
@@ -2310,7 +2329,6 @@ EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser,
   }
   return token;
 }
-
 EFJSON_PUBLIC efjsonStackLength
 efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, efjsonStackLength len) {
   efjsonStackLength i;
