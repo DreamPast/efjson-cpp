@@ -65,8 +65,8 @@ int main() {
 */
 #ifndef EFJSON_STREAM_H
 #define EFJSON_STREAM_H
-#include <stddef.h>
 #include <limits.h>
+#include <stddef.h>
 
 
 #if UCHAR_MAX != 0xFF
@@ -156,30 +156,37 @@ typedef unsigned efjsonStackLength;
 #endif
 
 /**
+ * Configuration: Provide pretty string for enums
+ */
+#ifndef EFJSON_CONF_PRETTIER
+  #define EFJSON_CONF_PRETTIER 1
+#endif
+
+/**
  * Configuration: Provide pretty string for `efjsonCategory`
  */
 #ifndef EFJSON_CONF_PRETTIER_CATEGORY
-  #define EFJSON_CONF_PRETTIER_CATEGORY 1
+  #define EFJSON_CONF_PRETTIER_CATEGORY EFJSON_CONF_PRETTIER
 #endif
 /**
  * Configuration: Provide pretty string for `efjsonError`
  */
 #ifndef EFJSON_CONF_PRETTIER_ERROR
-  #define EFJSON_CONF_PRETTIER_ERROR 1
+  #define EFJSON_CONF_PRETTIER_ERROR EFJSON_CONF_PRETTIER
 #endif
 
 /**
  * Configuration: Provide pretty string for `efjsonLocation`
  */
 #ifndef EFJSON_CONF_PRETTIER_LOCATION
-  #define EFJSON_CONF_PRETTIER_LOCATION 1
+  #define EFJSON_CONF_PRETTIER_LOCATION EFJSON_CONF_PRETTIER
 #endif
 
 /**
  * Configuration: Provide pretty string for `efjsonType`
  */
 #ifndef EFJSON_CONF_PRETTIER_TYPE
-  #define EFJSON_CONF_PRETTIER_TYPE 1
+  #define EFJSON_CONF_PRETTIER_TYPE EFJSON_CONF_PRETTIER
 #endif
 
 /**
@@ -350,10 +357,18 @@ enum efjsonError /* efjsonUint8 */ {
   efjsonError_UNEXPECTED_IN_NUMBER
 };
 
+#if EFJSON_CONF_PRETTIER_CATEGORY
 EFJSON_PUBLIC const char* efjson_stringifyCategory(efjsonUint8 category);
+#endif
+#if EFJSON_CONF_PRETTIER_TYPE
 EFJSON_PUBLIC const char* efjson_stringifyType(efjsonUint16 type);
+#endif
+#if EFJSON_CONF_PRETTIER_LOCATION
 EFJSON_PUBLIC const char* efjson_stringifyLocation(efjsonUint8 location);
+#endif
+#if EFJSON_CONF_PRETTIER_ERROR
 EFJSON_PUBLIC const char* efjson_stringifyError(efjsonUint8 error);
+#endif
 
 
 
@@ -576,8 +591,6 @@ EFJSON_PUBLIC enum efjsonStage efjsonStreamParser_getStage(const efjsonStreamPar
     #define efjson_cast(T, v) ((T)(v))
     #define efjson_reptr(T, p) ((T)(p))
   #endif
-  #ifdef efjson_reptr
-  #endif
 
   #define efjson_umax(T) efjson_cast(T, ~efjson_cast(T, 0))
 
@@ -625,10 +638,6 @@ EFJSON_PRIVATE const char* const efjson__CATEGORY_FORMAT[] = { "<error>", "white
 EFJSON_PUBLIC const char* efjson_stringifyCategory(efjsonUint8 category) {
   return category <= efjsonCategory_COMMENT ? efjson__CATEGORY_FORMAT[category] : "<unknown>";
 }
-  #else
-EFJSON_PUBLIC const char* efjson_stringifyCategory(efjsonUint8 category) {
-  return "<unconfigured>";
-}
   #endif
 
 
@@ -669,10 +678,6 @@ EFJSON_PUBLIC const char* efjson_stringifyType(efjsonUint16 type) {
   }
   return "<unknown>";
 }
-  #else
-EFJSON_PUBLIC const char* efjson_stringifyType(efjsonUint16 type) {
-  return "<unconfigured>";
-}
   #endif
 
 
@@ -682,10 +687,6 @@ EFJSON_PRIVATE const char* const efjson__LOCATION_FORMAT[] = {
 };
 EFJSON_PUBLIC const char* efjson_stringifyLocation(efjsonUint8 location) {
   return location <= efjsonLocation_OBJECT ? efjson__LOCATION_FORMAT[location] : "<unknown>";
-}
-  #else
-EFJSON_PUBLIC const char* efjson_stringifyLocation(efjsonUint8 location) {
-  return "<unconfigured>";
 }
   #endif
 
@@ -738,10 +739,6 @@ EFJSON_PUBLIC const char* efjson_stringifyError(efjsonUint8 error) {
     if(error <= efjsonError_UNEXPECTED_IN_NUMBER) return efjson__ERROR_FORMAT2[error - 0x80];
   }
   return "<unkown>";
-}
-  #else
-EFJSON_PUBLIC const char* efjson_stringifyError(efjsonUint8 error) {
-  return "<unconfigured>";
 }
   #endif
 
