@@ -90,6 +90,15 @@ typedef size_t efjsonPosition;
 typedef unsigned efjsonStackLength;
 
 
+#ifdef __cplusplus
+  #define EFJSON_CODE_BEGIN extern "C" {
+  #define EFJSON_CODE_END }
+#else
+  #define EFJSON_CODE_BEGIN
+  #define EFJSON_CODE_END
+#endif
+EFJSON_CODE_BEGIN
+
 /**
  * @def ul_likely
  * @brief Hints to the compiler that the condition is more likely to be true.
@@ -115,17 +124,12 @@ typedef unsigned efjsonStackLength;
   #define ul_unlikely(x) (x)
 #endif /* ul_unlikely */
 
-#ifdef __cplusplus
-  #define EFJSON_EXTERN_C extern "C"
-#else
-  #define EFJSON_EXTERN_C
-#endif
 
 #ifndef EFJSON_PUBLIC
-  #define EFJSON_PUBLIC EFJSON_EXTERN_C
+  #define EFJSON_PUBLIC
 #endif
 #ifndef EFJSON_PRIVATE
-  #define EFJSON_PRIVATE EFJSON_EXTERN_C static
+  #define EFJSON_PRIVATE static
 #endif
 
 
@@ -589,6 +593,7 @@ enum efjsonStage {
   efjsonStage_ENDED = 1
 };
 EFJSON_PUBLIC enum efjsonStage efjsonStreamParser_getStage(const efjsonStreamParser* parser);
+EFJSON_CODE_END
 
 
 #if EFJSON_CONF_FIXED_STACK > 0
@@ -603,6 +608,7 @@ EFJSON_PUBLIC enum efjsonStage efjsonStreamParser_getStage(const efjsonStreamPar
   #include <string.h>
   #include <stdlib.h>
 
+EFJSON_CODE_BEGIN
   #ifdef __cplusplus
     #define efjson_cast(T, v) (static_cast<T>(v))
     #define efjson_reptr(T, p) (reinterpret_cast<T>(p))
@@ -2415,6 +2421,7 @@ EFJSON_PUBLIC efjsonUint8 efjson_getError(efjsonToken token) {
 }
 
 
+EFJSON_CODE_END
   #undef efjson_cast
   #undef efjson_reptr
   #undef efjson_umax
