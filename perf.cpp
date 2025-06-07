@@ -1,5 +1,9 @@
-#define EFJSON_CONF_FIXED_STACK 0
+#define EFJSON_CONF_FIXED_STACK 2000000
 #include "efjson.hpp"
+
+#define ANKERL_NANOBENCH_IMPLEMENT
+#include "nanobench.h"
+
 #include <string>
 #include <chrono>
 #include <random>
@@ -50,29 +54,37 @@ double measure(Func&& func) {
 }
 
 int main() {
+  auto bencher = ankerl::nanobench::Bench{};
+
   {
     std::string str = genArray();
-    std::cout << "array: " << measure([&str] {
-      efjson::StreamParser parser;
-      parser.feed(str);
-      parser.end();
-    }) << '\n';
+    bencher.run("array", ([&str] {
+                  auto parser = new efjsonStreamParser{};
+                  efjsonStreamParser_init(parser, 0);
+                  for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
+                  efjsonStreamParser_feedOne(parser, 0);
+                  efjsonStreamParser_deinit(parser);
+                }));
   }
   {
     std::string str = genObject();
-    std::cout << "object: " << measure([&str] {
-      efjson::StreamParser parser;
-      parser.feed(str);
-      parser.end();
-    }) << '\n';
+    bencher.run("object", ([&str] {
+                  auto parser = new efjsonStreamParser{};
+                  efjsonStreamParser_init(parser, 0);
+                  for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
+                  efjsonStreamParser_feedOne(parser, 0);
+                  efjsonStreamParser_deinit(parser);
+                }));
   }
   {
     std::string str = genRecursiveArray();
-    std::cout << "recursive_array: " << measure([&str] {
-      efjson::StreamParser parser;
-      parser.feed(str);
-      parser.end();
-    }) << '\n';
+    bencher.run("recursive_array", ([&str] {
+                  auto parser = new efjsonStreamParser{};
+                  efjsonStreamParser_init(parser, 0);
+                  for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
+                  efjsonStreamParser_feedOne(parser, 0);
+                  efjsonStreamParser_deinit(parser);
+                }));
   }
   return 0;
 }

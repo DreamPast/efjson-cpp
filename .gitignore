@@ -3,3 +3,10 @@
 build/*
 out/*
 tmp/*
+
+# Debug
+*.ilk
+*.pdb
+*.gcov
+*.gcno
+*.gcda
