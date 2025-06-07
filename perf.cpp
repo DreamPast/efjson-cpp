@@ -59,31 +59,31 @@ int main() {
   {
     std::string str = genArray();
     bencher.run("array", ([&str] {
-                  auto parser = new efjsonStreamParser{};
-                  efjsonStreamParser_init(parser, 0);
+                  auto parser = efjsonStreamParser_new(0);
                   for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
                   efjsonStreamParser_feedOne(parser, 0);
                   efjsonStreamParser_deinit(parser);
+                  efjsonStreamParser_destroy(parser);
                 }));
   }
   {
     std::string str = genObject();
     bencher.run("object", ([&str] {
-                  auto parser = new efjsonStreamParser{};
-                  efjsonStreamParser_init(parser, 0);
+                  auto parser = efjsonStreamParser_new(0);
                   for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
                   efjsonStreamParser_feedOne(parser, 0);
                   efjsonStreamParser_deinit(parser);
+                  efjsonStreamParser_destroy(parser);
                 }));
   }
   {
     std::string str = genRecursiveArray();
     bencher.run("recursive_array", ([&str] {
-                  auto parser = new efjsonStreamParser{};
-                  efjsonStreamParser_init(parser, 0);
+                  auto parser = efjsonStreamParser_new(0);
                   for(auto c: str) efjsonStreamParser_feedOne(parser, static_cast<efjsonUint32>(c));
                   efjsonStreamParser_feedOne(parser, 0);
                   efjsonStreamParser_deinit(parser);
+                  efjsonStreamParser_destroy(parser);
                 }));
   }
   return 0;

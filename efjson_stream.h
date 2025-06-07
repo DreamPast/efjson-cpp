@@ -209,6 +209,8 @@ typedef struct efjsonUtf8Decoder {
   efjsonUint16 rest, total;
 } efjsonUtf8Decoder;
 EFJSON_PUBLIC size_t efjsonUtf8Decoder_sizeof(void);
+EFJSON_PUBLIC efjsonUtf8Decoder* efjsonUtf8Decoder_new(void);
+EFJSON_PUBLIC void efjsonUtf8Decoder_destroy(efjsonUtf8Decoder* decoder);
 EFJSON_PUBLIC void efjsonUtf8Decoder_init(efjsonUtf8Decoder* decoder);
 /** return number of decoded bytes (0/1 for normal, -1 for error) */
 EFJSON_PUBLIC int efjsonUtf8Decoder_feed(efjsonUtf8Decoder* decoder, efjsonUint32* result, efjsonUint8 c);
@@ -219,6 +221,8 @@ typedef struct efjsonUtf16Decoder {
   efjsonUint16 first;
 } efjsonUtf16Decoder;
 EFJSON_PUBLIC size_t efjsonUtf16Decoder_sizeof(void);
+EFJSON_PUBLIC efjsonUtf16Decoder* efjsonUtf16Decoder_new(void);
+EFJSON_PUBLIC void efjsonUtf16Decoder_destroy(efjsonUtf16Decoder* decoder);
 EFJSON_PUBLIC void efjsonUtf16Decoder_init(efjsonUtf16Decoder* decoder);
 /** return number of decoded bytes (0/1 for normal, -1 for error) */
 EFJSON_PUBLIC int efjsonUtf16Decoder_feed(efjsonUtf16Decoder* decoder, efjsonUint32* result, efjsonUint16 c);
@@ -528,6 +532,8 @@ typedef struct efjsonStreamParser {
 } efjsonStreamParser;
 
 EFJSON_PUBLIC size_t efjsonStreamParser_sizeof(void);
+EFJSON_PUBLIC efjsonStreamParser* efjsonStreamParser_new(efjsonUint32 option);
+EFJSON_PUBLIC void efjsonStreamParser_destroy(efjsonStreamParser* parser);
 EFJSON_PUBLIC void efjsonStreamParser_init(efjsonStreamParser* parser, efjsonUint32 option);
 EFJSON_PUBLIC void efjsonStreamParser_deinit(efjsonStreamParser* parser);
 EFJSON_PUBLIC int(efjsonStreamParser_initCopy)(efjsonStreamParser* parser, const efjsonStreamParser* src);
@@ -1260,6 +1266,12 @@ EFJSON_PRIVATE int efjson__isControl(efjsonUint32 u) {
 EFJSON_PUBLIC size_t efjsonUtf8Decoder_sizeof(void) {
   return sizeof(efjsonUtf8Decoder);
 }
+EFJSON_PUBLIC efjsonUtf8Decoder* efjsonUtf8Decoder_new(void) {
+  return efjson_reptr(efjsonUtf8Decoder*, calloc(1, sizeof(efjsonUtf8Decoder)));
+}
+EFJSON_PUBLIC void efjsonUtf8Decoder_destroy(efjsonUtf8Decoder* decoder) {
+  free(decoder);
+}
 EFJSON_PUBLIC void efjsonUtf8Decoder_init(efjsonUtf8Decoder* decoder) {
   memset(decoder, 0, sizeof(efjsonUtf8Decoder));
 }
@@ -1333,6 +1345,12 @@ EFJSON_PUBLIC int efjson_EncodeUtf8(efjsonUint8* p, efjsonUint32 u) {
 
 EFJSON_PUBLIC size_t efjsonUtf16Decoder_sizeof(void) {
   return sizeof(efjsonUtf16Decoder);
+}
+EFJSON_PUBLIC efjsonUtf16Decoder* efjsonUtf16Decoder_new(void) {
+  return efjson_reptr(efjsonUtf16Decoder*, calloc(1, sizeof(efjsonUtf16Decoder)));
+}
+EFJSON_PUBLIC void efjsonUtf16Decoder_destroy(efjsonUtf16Decoder* decoder) {
+  free(decoder);
 }
 EFJSON_PUBLIC void efjsonUtf16Decoder_init(efjsonUtf16Decoder* decoder) {
   memset(decoder, 0, sizeof(efjsonUtf16Decoder));
@@ -2230,6 +2248,17 @@ EFJSON_PUBLIC void efjsonStreamParser_deinit(efjsonStreamParser* parser) {
   parser->len = 0;
   parser->cap = 0;
   #endif
+}
+EFJSON_PUBLIC efjsonStreamParser* efjsonStreamParser_new(efjsonUint32 option) {
+  efjsonStreamParser* parser = efjson_reptr(efjsonStreamParser*, malloc(sizeof(efjsonStreamParser)));
+  if(ul_likely(parser != NULL)) efjsonStreamParser_init(parser, option);
+  return parser;
+}
+EFJSON_PUBLIC void efjsonStreamParser_destroy(efjsonStreamParser* parser) {
+  #if !(EFJSON_CONF_FIXED_STACK > 0)
+  if(ul_likely(parser != NULL)) efjsonStreamParser_deinit(parser);
+  #endif
+  free(parser);
 }
 EFJSON_PUBLIC int(efjsonStreamParser_initCopy)(efjsonStreamParser* parser, const efjsonStreamParser* src) {
   #if EFJSON_CONF_FIXED_STACK > 0
