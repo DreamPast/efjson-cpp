@@ -579,7 +579,11 @@ EFJSON_PUBLIC void(efjsonStreamParser_initMove)(efjsonStreamParser* parser, efjs
 EFJSON_PUBLIC efjsonStreamParser* efjsonStreamParser_newCopy(const efjsonStreamParser* src);
 
 EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser, efjsonUint32 u);
-/* note: if the string ends, remember to pass EOF to parser */
+/**
+ * Pass multiple UTF-32 characters to the parser.
+ * @note If the string ends, remember to pass `EOF` to parser.
+ * @return 0 if failed (and error will be writen to `dest[0]`), or the number of tokens if success.
+ */
 EFJSON_PUBLIC efjsonStackLength
 efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, efjsonStackLength len);
 
@@ -1356,7 +1360,7 @@ EFJSON_PUBLIC int efjson_EncodeUtf8(efjsonUint8* p, efjsonUint32 u) {
       if(u <= 0xFFFFu) {
         *q++ = efjson_cast(efjsonUint8, (u >> 12) | 0xE0);
       } else {
-        if(ul_likely(u <= 0x10FFFF)) {
+        if(ul_likely(u <= 0x10FFFFu)) {
           *q++ = efjson_cast(efjsonUint8, (u >> 18) | 0xF0);
         } else {
           return -1;
@@ -1885,7 +1889,6 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
       }
   }
 }
-
 EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, efjsonUint32 u) {
   efjsonToken token = { /* .type = */ efjsonType_ERROR,
                         /* .location = */ 0,
@@ -2250,6 +2253,18 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
   }
   return token;
 }
+  #if EFJSON_CONF_COMPRESS_STACK
+    #undef efjson__bitshl
+    #undef efjson___pushArray
+    #undef efjson___pushObject
+  #endif
+  #undef efjson__stackLen
+  #undef efjson__push
+  #undef efjson__last
+  #undef efjson__transformLocation
+  #undef efjson__nextLocation
+  #undef efjson__hexDigit
+
 
 EFJSON_PUBLIC size_t efjsonStreamParser_sizeof(void) {
   return sizeof(efjsonStreamParser);
@@ -2326,37 +2341,46 @@ EFJSON_PUBLIC efjsonStreamParser* efjsonStreamParser_newCopy(const efjsonStreamP
   return parser;
 }
 
+
+  #if EFJSON_CONF_CHECK_POSITION_OVERFLOW
+    #define efjsonStreamParser__checkPosition(parser, uc, token, fail_stat)                 \
+      if(ul_unlikely(((parser)->position == efjson_umax(efjsonPosition)) && ((uc) != 0))) { \
+        memset(&(token), 0, sizeof(efjsonToken));                                           \
+        (token).type = efjsonType_ERROR;                                                    \
+        (token).u.error = efjsonError_POSITION_OVERFLOW;                                    \
+        fail_stat                                                                           \
+      }                                                                                     \
+      ((void)0)
+  #else
+    #define efjsonStreamParser__checkPosition(parser, uc, token, fail_stat)
+  #endif
+  #define efjsonStreamParser__movePosition(parser, uc)     \
+    if(ul_unlikely((parser)->flag & efjsonFlag__MeetCr)) { \
+      if(ul_unlikely((uc) != 0x0A /* '\n' */)) {           \
+        ++(parser)->line;                                  \
+        (parser)->column = 0;                              \
+      }                                                    \
+      (parser)->flag &= ~efjsonFlag__MeetCr;               \
+    }                                                      \
+    if(ul_likely((uc) != 0)) {                             \
+      ++(parser)->position;                                \
+      if(efjson__isNextLine((uc))) {                       \
+        if((uc) == 0x0D /* '\r' */) {                      \
+          ++(parser)->column;                              \
+          (parser)->flag |= efjsonFlag__MeetCr;            \
+        } else {                                           \
+          ++(parser)->line;                                \
+          (parser)->column = 0;                            \
+        }                                                  \
+      } else ++(parser)->column;                           \
+    }                                                      \
+    ((void)0)
 EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser, efjsonUint32 u) {
   efjsonToken token;
-  #if EFJSON_CONF_CHECK_POSITION_OVERFLOW
-  if(ul_unlikely((parser->position == efjson_umax(efjsonPosition)) && (u != 0))) {
-    memset(&token, 0, sizeof(efjsonToken));
-    token.type = efjsonType_ERROR;
-    token.u.error = efjsonError_POSITION_OVERFLOW;
-    return token;
-  }
-  #endif
+  efjsonStreamParser__checkPosition(parser, u, token, return token;);
   token = efjsonStreamParser__step(parser, u);
   if(ul_likely(token.type != 0)) {
-    if(ul_unlikely(parser->flag & efjsonFlag__MeetCr)) {
-      if(ul_unlikely(u != 0x0A /* '\n' */)) {
-        ++parser->line;
-        parser->column = 0;
-      }
-      parser->flag &= ~efjsonFlag__MeetCr;
-    }
-    if(ul_likely(u != 0)) ++parser->position;
-    if(efjson__isNextLine(u)) {
-      if(u == 0x0D /* '\r' */) {
-        ++parser->column;
-        parser->flag |= efjsonFlag__MeetCr;
-      } else {
-        ++parser->line;
-        parser->column = 0;
-      }
-    } else {
-      if(ul_likely(u != 0)) ++parser->column;
-    }
+    efjsonStreamParser__movePosition(parser, u);
   }
   return token;
 }
@@ -2364,39 +2388,19 @@ EFJSON_PUBLIC efjsonStackLength
 efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, efjsonStackLength len) {
   efjsonStackLength i;
   for(i = 0; i < len; ++i) {
-  #if EFJSON_CONF_CHECK_POSITION_OVERFLOW
-    if(ul_unlikely(parser->position == efjson_umax(efjsonPosition)) && ul_likely(src[i] != 0)) {
-      memset(&dest[i], 0, sizeof(efjsonToken));
-      dest[i].type = efjsonType_ERROR;
-      dest[i].u.error = efjsonError_POSITION_OVERFLOW;
-      return i;
-    }
-  #endif
-    if(ul_unlikely(parser->flag & efjsonFlag__MeetCr)) {
-      if(src[i] != 0x0A /* '\n' */) {
-        ++parser->line;
-        parser->column = 0;
-      }
-      parser->flag &= ~efjsonFlag__MeetCr;
-    }
+    efjsonStreamParser__checkPosition(parser, src[i], dest[0], return 0;);
     dest[i] = efjsonStreamParser__step(parser, src[i]);
     if(ul_likely(dest[i].type != 0)) {
-      if(ul_likely(src[i] != 0)) ++parser->position;
-      if(efjson__isNextLine(src[i])) {
-        if(src[i] == 0x0D /* '\r' */) {
-          ++parser->column;
-          parser->flag |= efjsonFlag__MeetCr;
-        } else {
-          ++parser->line;
-          parser->column = 0;
-        }
-      } else {
-        if(src[i] != 0) ++parser->column;
-      }
+      efjsonStreamParser__movePosition(parser, src[i]);
+    } else {
+      dest[0] = dest[i];
+      return 0;
     }
   }
   return i;
 }
+  #undef efjsonStreamParser__checkPosition
+  #undef efjsonStreamParser__movePosition
 
 
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getLine(const efjsonStreamParser* parser) {
@@ -2427,17 +2431,6 @@ EFJSON_CODE_END
   #undef efjson_umax
   #undef efjson_assert
   #undef efjson_condexpr
-  #undef efjson__hexDigit
-  #undef efjson__nextLocation
-  #undef efjson__transformLocation
-  #undef efjson__stackLen
-  #if EFJSON_CONF_COMPRESS_STACK
-    #undef efjson__bitshl
-    #undef efjson___pushArray
-    #undef efjson___pushObject
-  #endif
-  #undef efjson__push
-  #undef efjson__last
 #endif /* EFJSON_STREAM_IMPL */
 
 
