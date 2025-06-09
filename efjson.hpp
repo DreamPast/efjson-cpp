@@ -316,7 +316,7 @@ public:
   Token feedOne(char32_t u) {
     efjsonToken token = efjsonStreamParser_feedOne(&parser, static_cast<efjsonUint32>(u));
     if(token.type == efjsonType_ERROR) {
-      throw JsonStreamParserException(static_cast<Error>(token.u.error), u, getPosition(), getLine(), getColumn());
+      throw JsonStreamParserException(static_cast<Error>(token.extra), u, getPosition(), getLine(), getColumn());
     }
     return Token(token, static_cast<efjsonUint32>(u));
   }
