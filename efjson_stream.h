@@ -460,94 +460,94 @@ enum efjsonOption {
   /**
    * whether to accept whitespace in JSON5
    */
-  efjsonOption_JSON5_WHITESPACE = 0x00001u,
+  efjsonOption_JSON5_WHITESPACE = 0x000001u,
 
   /* << array >> */
   /**
    * whether to accept a single trailing comma in array
    * @example '[1,]'
    */
-  efjsonOption_TRAILING_COMMA_IN_ARRAY = 0x00002u,
+  efjsonOption_TRAILING_COMMA_IN_ARRAY = 0x000002u,
 
   /* << object >> */
   /**
    * whether to accept a single trailing comma in object
    * @example '{"a":1,}'
    */
-  efjsonOption_TRAILING_COMMA_IN_OBJECT = 0x00004u,
+  efjsonOption_TRAILING_COMMA_IN_OBJECT = 0x000004u,
   /**
    * whether to accept identifier key in object
    * @example '{a:1}'
    */
-  efjsonOption_IDENTIFIER_KEY = 0x00008u,
+  efjsonOption_IDENTIFIER_KEY = 0x000008u,
 
   /* << string >> */
   /**
    * whether to accept single quote in string
    * @example "'a'"
    */
-  efjsonOption_SINGLE_QUOTE = 0x00010u,
+  efjsonOption_SINGLE_QUOTE = 0x000010u,
   /**
    * whether to accept multi-line string
    * @example '"a\\\nb"'
    */
-  efjsonOption_MULTILINE_STRING = 0x00020u,
+  efjsonOption_MULTILINE_STRING = 0x000020u,
   /**
    * whether to accept JSON5 string escape
    * @example '"\\x01"', '\\v', '\\0'
    */
-  efjsonOption_JSON5_STRING_ESCAPE = 0x00040u,
+  efjsonOption_JSON5_STRING_ESCAPE = 0x000040u,
 
   /* << number >> */
   /**
    * whether to accept positive sign in number
    * @example '+1', '+0'
    */
-  efjsonOption_POSITIVE_SIGN = 0x00080u,
+  efjsonOption_POSITIVE_SIGN = 0x000080u,
   /**
    * whether to accept empty fraction in number
    * @example '1.', '0.'
    */
-  efjsonOption_EMPTY_FRACTION = 0x00100u,
+  efjsonOption_EMPTY_FRACTION = 0x000100u,
   /**
    * whether to accept empty integer in number
    * @example '.1', '.0'
    */
-  efjsonOption_EMPTY_INTEGER = 0x00200u,
+  efjsonOption_EMPTY_INTEGER = 0x000200u,
   /**
    * whether to accept NaN
    */
-  efjsonOption_NAN = 0x004000u,
+  efjsonOption_NAN = 0x000400u,
   /**
    * whether to accept Infinity
    */
-  efjsonOption_INFINITY = 0x00800u,
+  efjsonOption_INFINITY = 0x000800u,
   /**
    * whether to accept hexadecimal integer
    * @example '0x1', '0x0'
    */
-  efjsonOption_HEXADECIMAL_INTEGER = 0x01000u,
+  efjsonOption_HEXADECIMAL_INTEGER = 0x001000u,
   /**
    * whether to accept octal integer
    * @example '0o1', '0o0'
    */
-  efjsonOption_OCTAL_INTEGER = 0x02000u,
+  efjsonOption_OCTAL_INTEGER = 0x002000u,
   /**
    * whether to accept binary integer
    * @example '0b1', '0b0'
    */
-  efjsonOption_BINARY_INTEGER = 0x04000u,
+  efjsonOption_BINARY_INTEGER = 0x004000u,
 
   /* << comment >> */
   /**
    * whether to accept single line comment
    * @example '// a comment'
    */
-  efjsonOption_SINGLE_LINE_COMMENT = 0x08000u,
+  efjsonOption_SINGLE_LINE_COMMENT = 0x008000u,
   /**
    * whether to accept multi-line comment
    */
-  efjsonOption_MULTI_LINE_COMMENT = 0x10000u
+  efjsonOption_MULTI_LINE_COMMENT = 0x010000u
 };
 
 typedef struct efjsonStreamParser {
