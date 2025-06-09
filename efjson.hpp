@@ -48,6 +48,19 @@ int main() {
 }
 ```
 */
+
+#define EFJSON_CONF_UTF_ENCODER 1
+#define EFJSON_CONF_CHECK_POSITION_OVERFLOW 0
+#define EFJSON_CONF_PRETTIER 1
+#define EFJSON_CONF_PRETTIER_CATEGORY 1
+#define EFJSON_CONF_PRETTIER_ERROR 1
+#define EFJSON_CONF_PRETTIER_LOCATION 1
+#define EFJSON_CONF_PRETTIER_TYPE 1
+#define EFJSON_CONF_CHECK_SIZET_OVERFLOW 1
+#define EFJSON_CONF_EXPOSE_UNICODE 1
+#define EFJSON_CONF_CHECK_INPUT_UTF 0
+#define EFJSON_CONF_COMBINE_ESCAPED_SURROGATE 1
+#define EFJSON_CONF_CHECK_ESCAPE_UTF 1
 #define EFJSON_STREAM_IMPL
 #include "efjson_stream.h"
 
@@ -198,6 +211,7 @@ public:
   StreamParserBase(StreamParserBase&& other) noexcept = default;
   StreamParserBase& operator=(const StreamParserBase& other) noexcept = default;
   StreamParserBase& operator=(StreamParserBase&& other) noexcept = default;
+  ~StreamParserBase() noexcept = default;
 #else
   StreamParserBase(const StreamParserBase& other) {
     if(efjsonStreamParser_initCopy(&parser, &other.parser) == 0) throw std::bad_alloc{};
@@ -218,6 +232,9 @@ public:
       efjsonStreamParser_initMove(&parser, &other.parser);
     }
     return *this;
+  }
+  ~StreamParserBase() noexcept {
+    efjsonStreamParser_deinit(&parser);
   }
 #endif
 
@@ -307,18 +324,27 @@ public:
 class StreamParser : public StreamParserBase {
 public:
   explicit StreamParser(efjsonUint32 option = 0) noexcept : StreamParserBase(option) { }
+  ~StreamParser() noexcept = default;
   StreamParser(const StreamParser& other) = default;
   StreamParser(StreamParser&& other) noexcept(EFJSON_CONF_FIXED_STACK > 0) = default;
   StreamParser& operator=(const StreamParser& other) = default;
   StreamParser& operator=(StreamParser&& other) noexcept(EFJSON_CONF_FIXED_STACK > 0) = default;
 
 public:
-  Token feedOne(char32_t u) {
+  /** don't check if `u` is a valid codepoint */
+  Token feedOneUnchecked(char32_t u) {
     efjsonToken token = efjsonStreamParser_feedOne(&parser, static_cast<efjsonUint32>(u));
     if(token.type == efjsonType_ERROR) {
       throw JsonStreamParserException(static_cast<Error>(token.extra), u, getPosition(), getLine(), getColumn());
     }
     return Token(token, static_cast<efjsonUint32>(u));
+  }
+  Token feedOne(char32_t u) {
+    if((u >= 0xD800u && u <= 0xDFFFu) || (u > 0x10FFFFu))
+      throw JsonStreamParserException(
+        static_cast<Error>(efjsonError_INVALID_INPUT_UTF), u, getPosition(), getLine(), getColumn()
+      );
+    return feedOneUnchecked(u);
   }
   Token end() {
     return feedOne(0);
@@ -344,9 +370,10 @@ public:
       case 0:
         break;
       case 1:
-        *out++ = feedOne(u);
+        *out++ = feedOneUnchecked(u);
       }
     }
+    if(efjsonUtf16Decoder_feed(&decoder, &u, 0) != 1) throw JsonUnicodeException{ "broken UTF-16 sequence" };
     return out;
   }
   template<class First, class Last, class OutIter>
@@ -363,9 +390,10 @@ public:
       case 0:
         break;
       case 1:
-        *out++ = feedOne(u);
+        *out++ = feedOneUnchecked(u);
       }
     }
+    if(efjsonUtf8Decoder_feed(&decoder, &u, 0) != 1) throw JsonUnicodeException{ "broken UTF-8 sequence" };
     return out;
   }
 

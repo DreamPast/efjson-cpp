@@ -9,6 +9,10 @@ int main() {
 \"object\":{\"1st\":[],\"2st\":{}}\
 }";
   efjson::StreamParser parser;
-  for(auto& token: parser.feed(src)) std::cout << token.toDebugString() << '\n';
+  try {
+    for(auto& token: parser.feed(src)) std::cout << token.toDebugString() << '\n';
+  } catch(const std::exception& e) {
+    std::cout << e.what() << '\n';
+  }
   return 0;
 }
