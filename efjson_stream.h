@@ -394,7 +394,6 @@ EFJSON_PUBLIC const char* efjson_stringifyError(efjsonUint8 error);
 #endif
 
 
-
 typedef struct efjsonToken {
   /**
    * The type of the token. (see `efjsonTokenType`)
@@ -584,8 +583,8 @@ EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser,
  * @note If the string ends, remember to pass `EOF` to parser.
  * @return 0 if failed (and error will be writen to `dest[0]`), or the number of tokens if success.
  */
-EFJSON_PUBLIC efjsonStackLength
-efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, efjsonStackLength len);
+EFJSON_PUBLIC size_t
+efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, size_t len);
 
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getLine(const efjsonStreamParser* parser);
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getColumn(const efjsonStreamParser* parser);
@@ -2384,9 +2383,9 @@ EFJSON_PUBLIC efjsonToken efjsonStreamParser_feedOne(efjsonStreamParser* parser,
   }
   return token;
 }
-EFJSON_PUBLIC efjsonStackLength
-efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, efjsonStackLength len) {
-  efjsonStackLength i;
+EFJSON_PUBLIC size_t
+efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efjsonUint32* src, size_t len) {
+  size_t i;
   for(i = 0; i < len; ++i) {
     efjsonStreamParser__checkPosition(parser, src[i], dest[0], return 0;);
     dest[i] = efjsonStreamParser__step(parser, src[i]);
