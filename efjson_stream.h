@@ -454,8 +454,7 @@ enum efjsonError /* efjsonUint8 */ {
   efjsonError_INVALID_ESCAPED_UTF,
   efjsonError_INCOMPLETE_SURROGATE_PAIR,
   /* << other >> */
-  efjsonError_COMMENT_FORBIDDEN = 0x80,
-  efjsonError_EOF,
+  efjsonError_EOF = 0x80,
   efjsonError_NONWHITESPACE_AFTER_END,
   efjsonError_CONTENT_AFTER_EOF,
   efjsonError_TRAILING_COMMA_FORBIDDEN,
@@ -487,7 +486,10 @@ enum efjsonError /* efjsonUint8 */ {
   efjsonError_FRACTION_NOT_ALLOWED,
   efjsonError_LEADING_ZERO_FORBIDDEN,
   efjsonError_POSITIVE_SIGN_FORBIDDEN,
-  efjsonError_UNEXPECTED_IN_NUMBER
+  efjsonError_UNEXPECTED_IN_NUMBER,
+  /* << comment >> */
+  efjsonError_COMMENT_FORBIDDEN,
+  efjsonError_COMMENT_NOT_CLOSED,
 };
 
 #if EFJSON_CONF_EXTENDED_JSON
@@ -843,7 +845,6 @@ EFJSON_PRIVATE const char* const efjson__ERROR_FORMAT1[] = {
 };
 EFJSON_PRIVATE const char* const efjson__ERROR_FORMAT2[] = {
   /* << other >> */
-  "comment not allowed",
   "structure broken because of EOF",
   "unexpected non-whitespace character after end of JSON",
   "content after EOF",
@@ -877,13 +878,16 @@ EFJSON_PRIVATE const char* const efjson__ERROR_FORMAT2[] = {
   "leading zero not allowed",
   "positive sign not allowed",
   "unexpected character in number",
+  /* << comment >> */
+  "comment not allowed",
+  "comment not closed",
 };
 
 EFJSON_PUBLIC const char* efjson_stringifyError(efjsonUint8 error) {
   if(error < 0x80) {
     if(error <= efjsonError_INCOMPLETE_SURROGATE_PAIR) return efjson__ERROR_FORMAT1[error];
   } else {
-    if(error <= efjsonError_UNEXPECTED_IN_NUMBER) return efjson__ERROR_FORMAT2[error - 0x80];
+    if(error <= efjsonError_COMMENT_NOT_CLOSED) return efjson__ERROR_FORMAT2[error - 0x80];
   }
   return "<unkown>";
 }
@@ -2480,10 +2484,18 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
     token.type = efjsonType_COMMENT_SINGLE_LINE;
     break;
   case efjsonVal__MULTI_LINE_COMMENT:
+    if(ul_unlikely(u == 0x00)) {
+      token.extra = efjsonError_COMMENT_NOT_CLOSED;
+      break;
+    }
     if(u == 0x2A /* '*' */) parser->state = efjsonVal__MULTI_LINE_COMMENT_MAY_END;
     token.type = efjsonType_COMMENT_MULTI_LINE;
     break;
   case efjsonVal__MULTI_LINE_COMMENT_MAY_END:
+    if(ul_unlikely(u == 0x00)) {
+      token.extra = efjsonError_COMMENT_NOT_CLOSED;
+      break;
+    }
     if(u == 0x2F /* '/' */) {
       parser->state = efjsonVal__EMPTY;
       token.type = efjsonType_COMMENT_MULTI_LINE_END;
