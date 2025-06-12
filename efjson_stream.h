@@ -487,6 +487,7 @@ enum efjsonError /* efjsonUint8 */ {
   efjsonError_LEADING_ZERO_FORBIDDEN,
   efjsonError_POSITIVE_SIGN_FORBIDDEN,
   efjsonError_UNEXPECTED_IN_NUMBER,
+  efjsonError_LONE_DECIMAL_POINT,
   /* << comment >> */
   efjsonError_COMMENT_FORBIDDEN,
   efjsonError_COMMENT_NOT_CLOSED,
@@ -878,6 +879,7 @@ EFJSON_PRIVATE const char* const efjson__ERROR_FORMAT2[] = {
   "leading zero not allowed",
   "positive sign not allowed",
   "unexpected character in number",
+  "lone decimal point not allowed",
   /* << comment >> */
   "comment not allowed",
   "comment not closed",
@@ -1662,6 +1664,15 @@ enum {
 };
 
 enum {
+  /** already accept digits */
+  efjsonNumberFraction__Digit = 0,
+  /** not yet accept any */
+  efjsonNumberFraction__NOT_YET = 1,
+  /** not yet accept any, and the integer part is empty */
+  efjsonNumberFraction__EMPTY_INTEGER = 2
+};
+
+enum {
   /** not yet accept any */
   efjsonNumberExponent__NOT_YET = 0,
   /** already accept sign, not accept digits */
@@ -1705,9 +1716,9 @@ enum {
    *
    *   `NUMBER`: <substate> `efjsonNumberState__*`
    *
-   *   `NUMBER_FRACTION`: <substate: 0|1> whether already accept digits
+   *   `NUMBER_FRACTION`: <substate> `efjsonNumberFraction__*`
    *
-   *   `NUMBER_EXPONENT`: <substate> `efjsonNumberExponent__`
+   *   `NUMBER_EXPONENT`: <substate> `efjsonNumberExponent__*`
    *
    *   `NULL`/`TRUE`/`FALSE`: <substate: 0..5> current index of string
    *
@@ -2009,7 +2020,7 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
   #if EFJSON_CONF_EXTENDED_JSON
         if(parser->option & efjsonOption_EMPTY_INTEGER) {
           parser->state = efjsonVal__NUMBER_FRACTION;
-          parser->substate = 0;
+          parser->substate = efjsonNumberFraction__EMPTY_INTEGER;
           token->type = efjsonType_NUMBER_FRACTION_START;
         } else
   #endif /* EFJSON_CONF_EXTENDED_JSON */
@@ -2329,7 +2340,9 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
         token.extra = efjsonError_EMPTY_INTEGER_PART;
       } else {
         parser->state = efjsonVal__NUMBER_FRACTION;
-        parser->substate = 0;
+        parser->substate = ul_unlikely(parser->substate == efjsonNumberState__ONLY_SIGN)
+                             ? efjsonNumberFraction__EMPTY_INTEGER
+                             : efjsonNumberFraction__NOT_YET;
         token.type = efjsonType_NUMBER_FRACTION_START;
       }
     } else if(ul_unlikely(parser->substate == efjsonNumberState__ONLY_SIGN)) {
@@ -2377,7 +2390,7 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
       token.extra = efjsonError_EMPTY_INTEGER_PART;
     else if(u == 0x2E /* '.' */) {
       parser->state = efjsonVal__NUMBER_FRACTION;
-      parser->substate = 0;
+      parser->substate = efjsonNumberFraction__NOT_YET;
       token.type = efjsonType_NUMBER_FRACTION_START;
     } else if(u == 0x65 /* 'e' */ || u == 0x45 /* 'E' */) {
       parser->state = efjsonVal__NUMBER_EXPONENT;
@@ -2390,12 +2403,14 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
     break;
   case efjsonVal__NUMBER_FRACTION:
     if(u >= 0x30 /* '0' */ && u <= 0x39 /* '9' */) {
-      parser->substate = 1;
+      parser->substate = efjsonNumberFraction__Digit;
       token.type = efjsonType_NUMBER_FRACTION_DIGIT;
     }
   #if EFJSON_CONF_EXTENDED_JSON
-    else if(!parser->substate && !(parser->option & efjsonOption_EMPTY_FRACTION)) {
+    else if(parser->substate != efjsonNumberFraction__Digit && !(parser->option & efjsonOption_EMPTY_FRACTION)) {
       token.extra = efjsonError_EMPTY_FRACTION_PART;
+    } else if(parser->substate == efjsonNumberFraction__EMPTY_INTEGER) {
+      token.extra = efjsonError_LONE_DECIMAL_POINT;
     } else if(u == 0x65 /* 'e' */ || u == 0x45 /* 'E' */) {
       parser->state = efjsonVal__NUMBER_EXPONENT;
       parser->substate = efjsonNumberExponent__NOT_YET;
@@ -2404,7 +2419,7 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
       efjsonStreamParser__handleNumberSeparator(parser, u, &token);
     else
   #else  /* !EFJSON_CONF_EXTENDED_JSON */
-    else if(!parser->substate) {
+    else if(parser->substate != efjsonNumberFraction__Digit) {
       token.extra = efjsonError_EMPTY_FRACTION_PART;
     } else if(u == 0x65 /* 'e' */ || u == 0x45 /* 'E' */) {
       parser->state = efjsonVal__NUMBER_EXPONENT;
