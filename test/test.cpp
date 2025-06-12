@@ -89,16 +89,8 @@ void testJson5() {
         checkJson(content, true, EFJSON_JSON5_OPTION);
         std::cout << "passed\n";
       } else if(filename.ends_with(".js") || filename.ends_with(".txt")) {
-        if(filename == "top-level-block-comment.txt" || filename == "top-level-inline-comment.txt") {
-          checkJson(content, false, 0);
-          checkJson(content, true, EFJSON_JSON5_OPTION);
-        } else if(filename == "empty.txt") {
-          checkJson(content, true, 0);
-          checkJson(content, true, EFJSON_JSON5_OPTION);
-        } else {
-          checkJson(content, false, 0);
-          checkJson(content, false, EFJSON_JSON5_OPTION);
-        }
+        checkJson(content, false, 0);
+        checkJson(content, false, EFJSON_JSON5_OPTION);
         std::cout << "passed\n";
       } else {
         std::cout << "continue\n";

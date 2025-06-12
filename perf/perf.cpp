@@ -128,7 +128,7 @@ auto readFileIntoUtf32(const std::string& filename) {
 
 int main() {
   auto bencher = ankerl::nanobench::Bench{};
-  bencher.epochs(50);
+  bencher.minEpochIterations(10);
 
   bencher.run("array", ([str = genArray()] { measureStep(str); }));
   bencher.run("object", ([str = genObject()] { measureStep(str); }));
