@@ -90,3 +90,11 @@ JSON5 规范：[The JSON5 Data Interchange Format](https://spec.json5.org/)
 JSON 指针: [JavaScript Object Notation (JSON) Pointer](https://datatracker.ietf.org/doc/html/rfc6901)
 
 相对 JSON 指针: [Relative JSON Pointers](https://datatracker.ietf.org/doc/html/draft-bhutton-relative-json-pointer-00)
+
+### 测试数据
+
+[JSON_checker](http://json.org/JSON_checker/)
+
+[json5-tests](https://github.com/json5/json5-tests)
+
+[Native JSON Benchmark](https://github.com/miloyip/nativejson-benchmark)

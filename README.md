@@ -102,3 +102,11 @@ JSON5 Specification: [The JSON5 Data Interchange Format](https://spec.json5.org/
 JSON Pointer: [JavaScript Object Notation (JSON) Pointer](https://datatracker.ietf.org/doc/html/rfc6901)
 
 Relative JSON Pointers: [Relative JSON Pointers](https://datatracker.ietf.org/doc/html/draft-bhutton-relative-json-pointer-00)
+
+### Test data
+
+[JSON_checker](http://json.org/JSON_checker/)
+
+[json5-tests](https://github.com/json5/json5-tests)
+
+[Native JSON Benchmark](https://github.com/miloyip/nativejson-benchmark)

@@ -10,6 +10,7 @@
 #include <random>
 #include <format>
 #include <iostream>
+#include <fstream>
 
 std::mt19937 rng(std::random_device{}());
 std::string genArray() {
