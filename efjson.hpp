@@ -312,8 +312,7 @@ public:
 
   auto toDebugString() const {
     return std::format(
-      "Token {{ {:<8} {:<30s} {}{} }}", stringify(static_cast<Location>(token.location)),
-      stringify(static_cast<TokenType>(token.type)), token.index, token.done ? '*' : ' '
+      "Token {{ {:<30s} {}{} }}", stringify(static_cast<TokenType>(token.type)), token.index, token.done ? '*' : ' '
     );
   }
 

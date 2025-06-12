@@ -33,27 +33,39 @@ Add `efjson_stream.h` and `efjson.hpp` to your project.
 #define EFJSON_STREAM_IMPL
 #include "efjson_stream.h"
 static const char src[] =
-  "{\
-\"null\":null,\"true\":true,\"false\":false,\
-\"string\":\"string,\\\"escape\\\",\\uD83D\\uDE00\",\
-\"integer\":12,\"negative\":-12,\"fraction\":12.34,\"exponent\":1.234e2,\
-\"array\":[\"1st element\",{\"object\":\"nesting\"}],\
-\"object\":{\"1st\":[],\"2st\":{}}\
+  "{\n\
+\"null\":null,\"true\":true,\"false\":false,\n\
+\"string\":\"string,\\\"escape\\\",\\uD83D\\uDE00\",\n\
+\"integer\":12,\"negative\":-12,\"fraction\":12.34,\"exponent\":1.234e2,\n\
+\"array\":[\"1st element\",{\"object\":\"nesting\"}],\n\
+\"object\":{\"1st\":[],\"2st\":{}}\n\
 }";
-int main() {
+int main(void) {
   efjsonStreamParser parser;
   unsigned i, n = sizeof(src) / sizeof(src[0]);
+  efjsonToken token;
+
   efjsonStreamParser_init(&parser, 0);
   for(i = 0; i < n; ++i) {
-    efjsonToken token = efjsonStreamParser_feedOne(&parser, src[i]);
+    printf(
+      "%2lu:%-2lu(%3lu)%-8s  ", efjson_cast(unsigned long, efjsonStreamParser_getLine(&parser)),
+      efjson_cast(unsigned long, efjsonStreamParser_getColumn(&parser)),
+      efjson_cast(unsigned long, efjsonStreamParser_getPosition(&parser)),
+      efjson_stringifyLocation(efjsonStreamParser_getLocation(&parser))
+    );
+    token = efjsonStreamParser_feedOne(&parser, efjson_cast(unsigned char, src[i]));
     if(token.type == efjsonType_ERROR) {
-      printf("%s\n", efjson_stringifyError(token.u.error));
+      printf("%s\n", efjson_stringifyError(efjson_cast(efjsonUint8, token.extra)));
       return 1;
     } else {
-      printf(
-        "%-8s %-30s %u%c\n", efjson_stringifyLocation(token.location), efjson_stringifyType(token.type), token.index,
-        token.done ? '*' : ' '
-      );
+      printf("%-30s %u%c", efjson_stringifyType(token.type), token.index, token.done ? '*' : ' ');
+      if(token.done) {
+        if(token.type == efjsonType_STRING_ESCAPE || token.type == efjsonType_STRING_ESCAPE_UNICODE
+           || token.type == efjsonType_STRING_ESCAPE_HEX || token.type == efjsonType_IDENTIFIER_ESCAPE) {
+          printf(" (U+%05lx)", efjson_cast(unsigned long, token.extra));
+        }
+      }
+      printf("\n");
     }
   }
   return 0;

@@ -36,27 +36,39 @@ define `EFJSON_STREAM_IMPL` to implement the library
 #define EFJSON_STREAM_IMPL
 #include "efjson_stream.h"
 static const char src[] =
-  "{\
-\"null\":null,\"true\":true,\"false\":false,\
-\"string\":\"string,\\\"escape\\\",\\uD83D\\uDE00\",\
-\"integer\":12,\"negative\":-12,\"fraction\":12.34,\"exponent\":1.234e2,\
-\"array\":[\"1st element\",{\"object\":\"nesting\"}],\
-\"object\":{\"1st\":[],\"2st\":{}}\
+  "{\n\
+\"null\":null,\"true\":true,\"false\":false,\n\
+\"string\":\"string,\\\"escape\\\",\\uD83D\\uDE00\",\n\
+\"integer\":12,\"negative\":-12,\"fraction\":12.34,\"exponent\":1.234e2,\n\
+\"array\":[\"1st element\",{\"object\":\"nesting\"}],\n\
+\"object\":{\"1st\":[],\"2st\":{}}\n\
 }";
-int main() {
+int main(void) {
   efjsonStreamParser parser;
   unsigned i, n = sizeof(src) / sizeof(src[0]);
+  efjsonToken token;
+
   efjsonStreamParser_init(&parser, 0);
   for(i = 0; i < n; ++i) {
-    efjsonToken token = efjsonStreamParser_feedOne(&parser, src[i]);
+    printf(
+      "%2lu:%-2lu(%3lu)%-8s  ", efjson_cast(unsigned long, efjsonStreamParser_getLine(&parser)),
+      efjson_cast(unsigned long, efjsonStreamParser_getColumn(&parser)),
+      efjson_cast(unsigned long, efjsonStreamParser_getPosition(&parser)),
+      efjson_stringifyLocation(efjsonStreamParser_getLocation(&parser))
+    );
+    token = efjsonStreamParser_feedOne(&parser, efjson_cast(unsigned char, src[i]));
     if(token.type == efjsonType_ERROR) {
-      printf("%s\n", efjson_stringifyError(token.extra));
+      printf("%s\n", efjson_stringifyError(efjson_cast(efjsonUint8, token.extra)));
       return 1;
     } else {
-      printf(
-        "%-8s %-30s %u%c\n", efjson_stringifyLocation(token.location), efjson_stringifyType(token.type), token.index,
-        token.done ? '*' : ' '
-      );
+      printf("%-30s %u%c", efjson_stringifyType(token.type), token.index, token.done ? '*' : ' ');
+      if(token.done) {
+        if(token.type == efjsonType_STRING_ESCAPE || token.type == efjsonType_STRING_ESCAPE_UNICODE
+           || token.type == efjsonType_STRING_ESCAPE_HEX || token.type == efjsonType_IDENTIFIER_ESCAPE) {
+          printf(" (U+%05lx)", efjson_cast(unsigned long, token.extra));
+        }
+      }
+      printf("\n");
     }
   }
   return 0;
@@ -437,29 +449,25 @@ typedef struct efjsonToken {
    * When `type` is `efjsonType_ERROR`, the `extra` field represents the error code (see `efjsonError`).
    *
    * `index` and `done` are only valid for specific `type`, and the following table indicates their range.
-   * Further, only when `done` is `1`, `extra` field is for the escaped codepoint.
+   * Further, if `done` is `0`, `extra` field is invalid.
    *
-   * | `type`                                   | `index` | `done` |
-   * | ---------------------------------------- | ------- | ------ |
-   * | `efjsonType_NULL`                        | 0..3    | 0,1    |
-   * | `efjsonType_FALSE`                       | 0..4    | 0,1    |
-   * | `efjsonType_TRUE`                        | 0..3    | 0,1    |
-   * | `efjsonType_NUMBER_INFINITY`             | 0..7    | 0,1    |
-   * | `efjsonType_NUMBER_NAN`                  | 0..2    | 0,1    |
-   * | `efjsonType_STRING_ESCAPE`               | 0       | 1      |
-   * | `efjsonType_STRING_ESCAPE_UNICODE` [^1]  | 0..4    | 0,1    |
-   * | `efjsonType_STRING_ESCAPE_HEX`           | 0,1     | 0,1    |
-   * | `efjsonType_IDENTIFIER_ESCAPE_START`[^2] | 0,1     | 0,1    |
-   * | `efjsonType_IDENTIFIER_ESCAPE`           | 0..3    | 0,1    |
+   * | `type`                                  | `index` | `done` | `extra` |
+   * | --------------------------------------- | ------- | ------ | ------- |
+   * | `efjsonType_NULL`                       | 0..3    | 0,1    | 0       |
+   * | `efjsonType_FALSE`                      | 0..4    | 0,1    | 0       |
+   * | `efjsonType_TRUE`                       | 0..3    | 0,1    | 0       |
+   * | `efjsonType_NUMBER_INFINITY`            | 0..7    | 0,1    | 0       |
+   * | `efjsonType_NUMBER_NAN`                 | 0..2    | 0,1    | 0       |
+   * | `efjsonType_STRING_ESCAPE`              | 0       | 1      | escape  |
+   * | `efjsonType_STRING_ESCAPE_UNICODE` [^1] | 0..4    | 0,1    | escape  |
+   * | `efjsonType_STRING_ESCAPE_HEX`          | 0,1     | 0,1    | escape  |
+   * | `efjsonType_IDENTIFIER_ESCAPE_START`    | 0,1     | 0,1    | 0       |
+   * | `efjsonType_IDENTIFIER_ESCAPE`          | 0..3    | 0,1    | escape  |
    *
    * [^1]: If `EFJSON_CONF_COMBINE_ESCAPED_SURROGATE` is set to `1`, the range of `index` will be `0..9`.
-   * [^2]: The `extra` field is always set to `0`.
    */
   efjsonUint8 type;
-  /**
-   * The location of the token in the JSON value. (see `efjsonLocation`)
-   */
-  efjsonUint8 location;
+  efjsonUint8 dummy_;
   /**
    * The index in the sequence.
    */
@@ -476,100 +484,98 @@ typedef struct efjsonToken {
 EFJSON_PUBLIC efjsonUint8 efjson_getError(efjsonToken token);
 
 
-enum efjsonOption {
-  /* << white space >> */
-  /**
-   * whether to accept whitespace in JSON5
-   */
-  efjsonOption_JSON5_WHITESPACE = 0x000001u,
+/* << white space >> */
+/**
+ * whether to accept whitespace in JSON5
+ */
+#define efjsonOption_JSON5_WHITESPACE 0x000001u
 
-  /* << array >> */
-  /**
-   * whether to accept a single trailing comma in array
-   * @example '[1,]'
-   */
-  efjsonOption_TRAILING_COMMA_IN_ARRAY = 0x000002u,
+/* << array >> */
+/**
+ * whether to accept a single trailing comma in array
+ * @example '[1,]'
+ */
+#define efjsonOption_TRAILING_COMMA_IN_ARRAY 0x000002u
 
-  /* << object >> */
-  /**
-   * whether to accept a single trailing comma in object
-   * @example '{"a":1,}'
-   */
-  efjsonOption_TRAILING_COMMA_IN_OBJECT = 0x000004u,
-  /**
-   * whether to accept identifier key in object
-   * @example '{a:1}'
-   */
-  efjsonOption_IDENTIFIER_KEY = 0x000008u,
+/* << object >> */
+/**
+ * whether to accept a single trailing comma in object
+ * @example '{"a":1,}'
+ */
+#define efjsonOption_TRAILING_COMMA_IN_OBJECT 0x000004u
+/**
+ * whether to accept identifier key in object
+ * @example '{a:1}'
+ */
+#define efjsonOption_IDENTIFIER_KEY 0x000008u
 
-  /* << string >> */
-  /**
-   * whether to accept single quote in string
-   * @example "'a'"
-   */
-  efjsonOption_SINGLE_QUOTE = 0x000010u,
-  /**
-   * whether to accept multi-line string
-   * @example '"a\\\nb"'
-   */
-  efjsonOption_MULTILINE_STRING = 0x000020u,
-  /**
-   * whether to accept JSON5 string escape
-   * @example '"\\x01"', '\\v', '\\0'
-   */
-  efjsonOption_JSON5_STRING_ESCAPE = 0x000040u,
+/* << string >> */
+/**
+ * whether to accept single quote in string
+ * @example "'a'"
+ */
+#define efjsonOption_SINGLE_QUOTE 0x000010u
+/**
+ * whether to accept multi-line string
+ * @example '"a\\\nb"'
+ */
+#define efjsonOption_MULTILINE_STRING 0x000020u
+/**
+ * whether to accept JSON5 string escape
+ * @example '"\\x01"', '\\v', '\\0'
+ */
+#define efjsonOption_JSON5_STRING_ESCAPE 0x000040u
 
-  /* << number >> */
-  /**
-   * whether to accept positive sign in number
-   * @example '+1', '+0'
-   */
-  efjsonOption_POSITIVE_SIGN = 0x000080u,
-  /**
-   * whether to accept empty fraction in number
-   * @example '1.', '0.'
-   */
-  efjsonOption_EMPTY_FRACTION = 0x000100u,
-  /**
-   * whether to accept empty integer in number
-   * @example '.1', '.0'
-   */
-  efjsonOption_EMPTY_INTEGER = 0x000200u,
-  /**
-   * whether to accept NaN
-   */
-  efjsonOption_NAN = 0x000400u,
-  /**
-   * whether to accept Infinity
-   */
-  efjsonOption_INFINITY = 0x000800u,
-  /**
-   * whether to accept hexadecimal integer
-   * @example '0x1', '0x0'
-   */
-  efjsonOption_HEXADECIMAL_INTEGER = 0x001000u,
-  /**
-   * whether to accept octal integer
-   * @example '0o1', '0o0'
-   */
-  efjsonOption_OCTAL_INTEGER = 0x002000u,
-  /**
-   * whether to accept binary integer
-   * @example '0b1', '0b0'
-   */
-  efjsonOption_BINARY_INTEGER = 0x004000u,
+/* << number >> */
+/**
+ * whether to accept positive sign in number
+ * @example '+1', '+0'
+ */
+#define efjsonOption_POSITIVE_SIGN 0x000080u
+/**
+ * whether to accept empty fraction in number
+ * @example '1.', '0.'
+ */
+#define efjsonOption_EMPTY_FRACTION 0x000100u
+/**
+ * whether to accept empty integer in number
+ * @example '.1', '.0'
+ */
+#define efjsonOption_EMPTY_INTEGER 0x000200u
+/**
+ * whether to accept NaN
+ */
+#define efjsonOption_NAN 0x000400u
+/**
+ * whether to accept Infinity
+ */
+#define efjsonOption_INFINITY 0x000800u
+/**
+ * whether to accept hexadecimal integer
+ * @example '0x1', '0x0'
+ */
+#define efjsonOption_HEXADECIMAL_INTEGER 0x001000u
+/**
+ * whether to accept octal integer
+ * @example '0o1', '0o0'
+ */
+#define efjsonOption_OCTAL_INTEGER 0x002000u
+/**
+ * whether to accept binary integer
+ * @example '0b1', '0b0'
+ */
+#define efjsonOption_BINARY_INTEGER 0x004000u
 
-  /* << comment >> */
-  /**
-   * whether to accept single line comment
-   * @example '// a comment'
-   */
-  efjsonOption_SINGLE_LINE_COMMENT = 0x008000u,
-  /**
-   * whether to accept multi-line comment
-   */
-  efjsonOption_MULTI_LINE_COMMENT = 0x010000u
-};
+/* << comment >> */
+/**
+ * whether to accept single line comment
+ * @example '// a comment'
+ */
+#define efjsonOption_SINGLE_LINE_COMMENT 0x008000u
+/**
+ * whether to accept multi-line comment
+ */
+#define efjsonOption_MULTI_LINE_COMMENT 0x010000u
 #define EFJSON_JSONC_OPTION \
   efjson_cast(efjsonUint32, efjsonOption_SINGLE_LINE_COMMENT | efjsonOption_MULTI_LINE_COMMENT)
 #define EFJSON_JSON5_OPTION                                                                                           \
@@ -581,6 +587,7 @@ enum efjsonOption {
                     | efjsonOption_INFINITY | efjsonOption_HEXADECIMAL_INTEGER                                        \
   )
 #define EFJSON_ALL_OPTION efjson_cast(efjsonUint32, ~efjson_cast(efjsonUint32, 0))
+
 
 typedef struct efjsonStreamParser {
   efjsonPosition position, line, column;
@@ -624,6 +631,7 @@ efjsonStreamParser_feed(efjsonStreamParser* parser, efjsonToken* dest, const efj
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getLine(const efjsonStreamParser* parser);
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getColumn(const efjsonStreamParser* parser);
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getPosition(const efjsonStreamParser* parser);
+EFJSON_PUBLIC efjsonUint8 efjsonStreamParser_getLocation(const efjsonStreamParser* parser);
 
 enum efjsonStage {
   efjsonStage_NOT_STARTED = -1,
@@ -1642,14 +1650,12 @@ EFJSON_PRIVATE void efjsonStreamParser__handleNumberSeparator(
       --parser->len;
       parser->state = efjsonVal__EMPTY;
       parser->location = efjson__last(parser);
-      token->location = efjson__transformLocation(parser->location);
       token->type = efjsonType_OBJECT_END;
     } else if(parser->location == efjsonLoc__KEY_START) {
       if(parser->option & efjsonOption_TRAILING_COMMA_IN_OBJECT) {
         --parser->len;
         parser->state = efjsonVal__EMPTY;
         parser->location = efjson__last(parser);
-        token->location = efjson__transformLocation(parser->location);
         token->type = efjsonType_OBJECT_END;
       } else {
         token->extra = efjsonError_COMMA_IN_EMPTY_OBJECT;
@@ -1662,14 +1668,12 @@ EFJSON_PRIVATE void efjsonStreamParser__handleNumberSeparator(
       --parser->len;
       parser->state = efjsonVal__EMPTY;
       parser->location = efjson__last(parser);
-      token->location = efjson__transformLocation(parser->location);
       token->type = efjsonType_ARRAY_END;
     } else if(parser->location == efjsonLoc__ELEMENT_START) {
       if(parser->option & efjsonOption_TRAILING_COMMA_IN_ARRAY) {
         --parser->len;
         parser->state = efjsonVal__EMPTY;
         parser->location = efjson__last(parser);
-        token->location = efjson__transformLocation(parser->location);
         token->type = efjsonType_ARRAY_END;
       } else {
         token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
@@ -1680,11 +1684,9 @@ EFJSON_PRIVATE void efjsonStreamParser__handleNumberSeparator(
   } else if(u == 0x2C /* ',' */) {
     if(parser->location == efjsonLoc__VALUE_END) {
       parser->location = efjsonLoc__KEY_START;
-      token->location = efjsonLocation_OBJECT;
       token->type = efjsonType_OBJECT_NEXT;
     } else if(parser->location == efjsonLoc__ELEMENT_END) {
       parser->location = efjsonLoc__ELEMENT_START;
-      token->location = efjsonLocation_OBJECT;
       token->type = efjsonType_ARRAY_NEXT;
     } else if(parser->location == efjsonLoc__ELEMENT_FIRST_START) {
       token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
@@ -1701,7 +1703,6 @@ EFJSON_PRIVATE void efjsonStreamParser__handleNumberSeparator(
       token->type = efjsonType_COMMENT_MAY_START;
     } else token->extra = efjsonError_COMMENT_FORBIDDEN;
   } else {
-    token->location = efjson__transformLocation(parser->location);
     token->type = efjsonType_WHITESPACE;
   }
 }
@@ -1759,7 +1760,6 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
     if(u == 0x3A /* ':' */) {
       if(ul_likely(parser->location == efjsonLoc__KEY_END)) {
         parser->location = efjsonLoc__VALUE_START;
-        token->location = efjsonLocation_OBJECT;
         token->type = efjsonType_OBJECT_VALUE_START;
       } else if(parser->location == efjsonLoc__VALUE_START) token->extra = efjsonError_REPEATED_COLON;
       else token->extra = efjsonError_WRONG_COLON;
@@ -1768,7 +1768,6 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
       if(parser->location == efjsonLoc__ELEMENT_FIRST_START || parser->location == efjsonLoc__ELEMENT_END) {
         --parser->len;
         parser->location = efjson__last(parser);
-        token->location = efjson__transformLocation(parser->location);
         token->type = efjsonType_ARRAY_END;
       } else if(parser->location == efjsonLoc__ELEMENT_START) {
         if(parser->option & efjsonOption_TRAILING_COMMA_IN_ARRAY) {
@@ -1785,13 +1784,11 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
       if(parser->location == efjsonLoc__KEY_FIRST_START || parser->location == efjsonLoc__VALUE_END) {
         --parser->len;
         parser->location = efjson__last(parser);
-        token->location = efjson__transformLocation(parser->location);
         token->type = efjsonType_OBJECT_END;
       } else if(ul_likely(parser->location == efjsonLoc__KEY_START)) {
         if(parser->option & efjsonOption_TRAILING_COMMA_IN_OBJECT) {
           --parser->len;
           parser->location = efjson__last(parser);
-          token->location = efjson__transformLocation(parser->location);
           token->type = efjsonType_OBJECT_END;
         } else {
           token->extra = efjsonError_COMMA_IN_EMPTY_OBJECT;
@@ -1802,11 +1799,9 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
     } else if(u == 0x2C /* ',' */) {
       if(parser->location == efjsonLoc__VALUE_END) {
         parser->location = efjsonLoc__KEY_START;
-        token->location = efjsonLocation_OBJECT;
         token->type = efjsonType_OBJECT_NEXT;
       } else if(ul_likely(parser->location == efjsonLoc__ELEMENT_END)) {
         parser->location = efjsonLoc__ELEMENT_START;
-        token->location = efjsonLocation_ARRAY;
         token->type = efjsonType_ARRAY_NEXT;
       } else if(parser->location == efjsonLoc__ELEMENT_FIRST_START) {
         token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
@@ -1834,7 +1829,6 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
   #endif
         efjson__push(parser, parser->location);
         parser->location = efjsonLoc__ELEMENT_FIRST_START;
-        token->location = efjson__transformLocation(parser->location);
         token->type = efjsonType_ARRAY_START;
         break;
       case 0x7B /* '{' */:
@@ -1924,11 +1918,10 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
 }
 EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, efjsonUint32 u) {
   efjsonToken token = { /* .type = */ efjsonType_ERROR,
-                        /* .location = */ 0,
+                        /* .dummy_ = */ 0,
                         /* .index = */ 0,
                         /* .done = */ 0,
                         /* .extra = */ 0 };
-  token.location = efjson__transformLocation(parser->location);
   if(ul_unlikely(parser->location == efjsonLoc__EOF)) {
     token.extra = efjsonError_CONTENT_AFTER_EOF;
     return token;
@@ -2045,6 +2038,8 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
       case 0x74 /* 't' */:
         u2 = 0x09 /* '\t' */;
         break;
+      default:
+        break;
       }
       if(parser->option & efjsonOption_JSON5_STRING_ESCAPE) switch(u) {
         case 0x27 /* '\'' */:
@@ -2055,6 +2050,8 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
           break;
         case 0x30 /* '0' */:
           u2 = 0x00 /* '\0' */;
+          break;
+        default:
           break;
         }
       if(ul_likely(u2 != 0xFF)) {
@@ -2314,7 +2311,6 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
     if(u == 0x3A /* ':' */) {
       parser->location = efjsonLoc__VALUE_START;
       parser->state = efjsonVal__EMPTY;
-      token.location = efjsonLocation_OBJECT;
       token.type = efjsonType_OBJECT_VALUE_START;
     } else if(efjson_isWhitespace(u, (parser->option & efjsonOption_JSON5_WHITESPACE) != 0)) {
       parser->location = efjsonLoc__KEY_END;
@@ -2374,7 +2370,6 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
   #undef efjson__stackLen
   #undef efjson__push
   #undef efjson__last
-  #undef efjson__transformLocation
   #undef efjson__nextLocation
   #undef efjson__hexDigit
   #undef efjson__isUtf16Surrogate
@@ -2525,16 +2520,20 @@ EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getColumn(const efjsonStreamPars
 EFJSON_PUBLIC efjsonPosition efjsonStreamParser_getPosition(const efjsonStreamParser* parser) {
   return parser->position;
 }
+EFJSON_PUBLIC efjsonUint8 efjsonStreamParser_getLocation(const efjsonStreamParser* parser) {
+  return efjson__transformLocation(parser->location);
+}
 EFJSON_PUBLIC enum efjsonStage efjsonStreamParser_getStage(const efjsonStreamParser* parser) {
   if(parser->state == efjsonVal__EMPTY) return efjsonStage_PARSING;
   else if(parser->location == efjsonLoc__ROOT_START) return efjsonStage_NOT_STARTED;
   else if(parser->location == efjsonLoc__ROOT_END || parser->location == efjsonLoc__EOF) return efjsonStage_ENDED;
   else return efjsonStage_PARSING;
 }
+  #undef efjson__transformLocation
 
 
 EFJSON_PUBLIC efjsonUint8 efjson_getError(efjsonToken token) {
-  return token.type == efjsonType_ERROR ? token.extra : 0;
+  return token.type == efjsonType_ERROR ? efjson_cast(efjsonUint8, token.extra) : 0;
 }
 
 
