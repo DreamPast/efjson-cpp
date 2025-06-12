@@ -144,6 +144,42 @@ EFJSON_CODE_BEGIN
   #define ul_unlikely(x) (x)
 #endif /* ul_unlikely */
 
+/**
+ * @def ul_unreachable
+ * @brief Hints to the compiler that the code is unreachable.
+ */
+#ifndef ul_unreachable
+  #if !defined(UL_PEDANTIC) && (defined(__GNUC__) || defined(__clang__))
+    #define ul_unreachable() __builtin_unreachable()
+  #elif !defined(UL_PEDANTIC) && defined(_MSC_VER) /* Visual Studio 6 */
+    #define ul_unreachable() __assume(0)
+  #elif defined(__cpp_lib_unreachable) && __cpp_lib_unreachable >= 202202L
+    #include <utility>
+    #define ul_unreachable() std::unreachable()
+  #else
+    #define ul_unreachable() ((void)0)
+  #endif
+#endif /* ul_unreachable */
+
+/**
+ * @def ul_noinline
+ * @brief Marks a function to not be inlined.
+ */
+#if !defined(ul_noinline) && !defined(UL_PEDANTIC) && defined(__has_attribute)
+  #if __has_attribute(noinline)
+    #define ul_noinline __attribute__((noinline))
+  #elif __has_attribute(__noinline__)
+    #define ul_noinline __attribute__((__noinline__))
+  #endif
+#endif /* ul_noinline */
+#ifndef ul_noinline
+  #if !defined(UL_PEDANTIC) && defined(_MSC_VER) && _MSC_VER >= 1310 /* Visual Studio 2003 */
+    #define ul_noinline __declspec(noinline)
+  #else
+    #define ul_noinline
+  #endif
+#endif /* ul_noinline */
+
 
 #ifndef EFJSON_PUBLIC
   #define EFJSON_PUBLIC
@@ -1320,7 +1356,9 @@ EFJSON_PRIVATE int efjson__isNumberSeparator(efjsonUint32 u, int fitJson5) {
 EFJSON_PRIVATE int efjson__isHexDigit(efjsonUint32 u) {
   return (u >= 0x30 && u <= 0x39) || (u >= 0x41 && u <= 0x46) || (u >= 0x61 && u <= 0x66);
 }
-  #define efjson__hexDigit(u) ((u) <= 0x39u ? (u) - 0x30u : ((u) & 0xF) + 9u)
+EFJSON_PRIVATE int efjson__hexDigit(efjsonUint32 u) {
+  return (u <= 0x39u ? u - 0x30u : (u & 0xF) + 9u);
+}
 EFJSON_PRIVATE int efjson__isControl(efjsonUint32 u) {
   return u <= 0x1F || u == 0x7F;
 }
@@ -1638,7 +1676,7 @@ EFJSON_PRIVATE void efjsonStreamParser__handleNumberSeparator(
 ) {
   parser->state = efjsonVal__EMPTY;
   parser->location = efjson__nextLocation(parser->location);
-  if(u == 0x00) {
+  if(ul_unlikely(u == 0x00)) {
     if(parser->location == efjsonLoc__ROOT_START || parser->location == efjsonLoc__ROOT_END) {
       token->type = efjsonType_EOF;
       parser->location = efjsonLoc__EOF;
@@ -1709,14 +1747,14 @@ EFJSON_PRIVATE void efjsonStreamParser__handleNumberSeparator(
 EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, efjsonUint32 u, efjsonToken* token) {
   if(efjson_isWhitespace(u, (parser->option & efjsonOption_JSON5_WHITESPACE) != 0)) {
     token->type = efjsonType_WHITESPACE;
-  } else if(u == 0x00) {
+  } else if(ul_unlikely(u == 0x00)) {
     if(ul_likely(parser->location == efjsonLoc__ROOT_START || parser->location == efjsonLoc__ROOT_END)) {
       parser->location = efjsonLoc__EOF;
       token->type = efjsonType_EOF;
     } else {
       token->extra = efjsonError_EOF;
     }
-  } else if(u == 0x2F /* '/' */) {
+  } else if(ul_unlikely(u == 0x2F /* '/' */)) {
     if(parser->option & (efjsonOption_SINGLE_LINE_COMMENT | efjsonOption_MULTI_LINE_COMMENT)) {
       parser->state = efjsonVal__COMMENT_MAY_START;
       token->type = efjsonType_COMMENT_MAY_START;
@@ -1989,11 +2027,11 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
     }
     ul_fallthrough;
   case efjsonVal__STRING:
-    if(u == (parser->flag & efjsonFlag__SingleQuote ? 0x27 /* '\'' */ : 0x22 /* '"' */)) {
+    if(u == (ul_unlikely(parser->flag & efjsonFlag__SingleQuote) ? 0x27 /* '\'' */ : 0x22 /* '"' */)) {
       parser->location = efjson__nextLocation(parser->location);
       parser->state = efjsonVal__EMPTY;
       token.type = efjsonType_STRING_END;
-    } else if(ul_likely(u == 0x5C /* '\\' */)) {
+    } else if(u == 0x5C /* '\\' */) {
       parser->state = efjsonVal__STRING_ESCAPE;
       token.type = efjsonType_STRING_ESCAPE_START;
     } else if(ul_unlikely(u == 0x00)) token.extra = efjsonError_EOF;
@@ -2041,7 +2079,7 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
       default:
         break;
       }
-      if(parser->option & efjsonOption_JSON5_STRING_ESCAPE) switch(u) {
+      if((parser->option & efjsonOption_JSON5_STRING_ESCAPE)) switch(u) {
         case 0x27 /* '\'' */:
           u2 = 0x27 /* '\'' */;
           break;
@@ -2062,7 +2100,7 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
         break;
       }
     }
-    if((parser->option & efjsonOption_MULTILINE_STRING) && ul_likely(efjson__isNextLine(u))) {
+    if(ul_unlikely(parser->option & efjsonOption_MULTILINE_STRING) && efjson__isNextLine(u)) {
       parser->state = (u == 0x0D /* '\r' */ ? efjsonVal__STRING_MULTILINE_CR : efjsonVal__STRING);
       token.type = efjsonType_STRING_NEXT_LINE;
     } else if((parser->option & efjsonOption_JSON5_STRING_ESCAPE) && u == 0x78 /* 'x' */) {
@@ -2359,6 +2397,9 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
         }
       } else token.extra = efjsonError_INVALID_IDENTIFIER_ESCAPE;
     }
+    break;
+  default:
+    ul_unreachable();
   }
   return token;
 }
@@ -2371,7 +2412,6 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
   #undef efjson__push
   #undef efjson__last
   #undef efjson__nextLocation
-  #undef efjson__hexDigit
   #undef efjson__isUtf16Surrogate
 
 
