@@ -61,6 +61,7 @@ int main() {
 #define EFJSON_CONF_CHECK_INPUT_UTF 0
 #define EFJSON_CONF_COMBINE_ESCAPED_SURROGATE 1
 #define EFJSON_CONF_CHECK_ESCAPE_UTF 1
+// #define EFJSON_CONF_EXTENDED_JSON 1
 #define EFJSON_STREAM_IMPL
 #include "efjson_stream.h"
 
@@ -88,8 +89,10 @@ enum class Category : uint8_t {
   Number = efjsonCategory_NUMBER,
   Object = efjsonCategory_OBJECT,
   Array = efjsonCategory_ARRAY,
+#if EFJSON_CONF_EXTENDED_JSON
   Identifier = efjsonCategory_IDENTIFIER,
   Comment = efjsonCategory_COMMENT,
+#endif
 };
 enum class TokenType : uint16_t {
   Error = efjsonType_ERROR,
@@ -105,9 +108,11 @@ enum class TokenType : uint16_t {
   StringEscape = efjsonType_STRING_ESCAPE,
   StringEscape_unicode_start = efjsonType_STRING_ESCAPE_UNICODE_START,
   StringEscape_unicode = efjsonType_STRING_ESCAPE_UNICODE,
+#if EFJSON_CONF_EXTENDED_JSON
   StringNextLine = efjsonType_STRING_NEXT_LINE,
   StringEscapeHex_start = efjsonType_STRING_ESCAPE_HEX_START,
   StringEscapeHex = efjsonType_STRING_ESCAPE_HEX,
+#endif
   NumberIntegerDigit = efjsonType_NUMBER_INTEGER_DIGIT,
   NumberFractionDigit = efjsonType_NUMBER_FRACTION_DIGIT,
   NumberExponentDigit = efjsonType_NUMBER_EXPONENT_DIGIT,
@@ -115,6 +120,7 @@ enum class TokenType : uint16_t {
   NumberExponentSign = efjsonType_NUMBER_EXPONENT_SIGN,
   NumberFractionStart = efjsonType_NUMBER_FRACTION_START,
   NumberExponentStart = efjsonType_NUMBER_EXPONENT_START,
+#if EFJSON_CONF_EXTENDED_JSON
   NumberNan = efjsonType_NUMBER_NAN,
   NumberInfinity = efjsonType_NUMBER_INFINITY,
   NumberHex_start = efjsonType_NUMBER_HEX_START,
@@ -123,6 +129,7 @@ enum class TokenType : uint16_t {
   NumberOct = efjsonType_NUMBER_OCT,
   NumberBin_start = efjsonType_NUMBER_BIN_START,
   NumberBin = efjsonType_NUMBER_BIN,
+#endif
   ObjectStart = efjsonType_OBJECT_START,
   ObjectNext = efjsonType_OBJECT_NEXT,
   ObjectValueStart = efjsonType_OBJECT_VALUE_START,
@@ -130,6 +137,7 @@ enum class TokenType : uint16_t {
   ArrayStart = efjsonType_ARRAY_START,
   ArrayNext = efjsonType_ARRAY_NEXT,
   ArrayEnd = efjsonType_ARRAY_END,
+#if EFJSON_CONF_EXTENDED_JSON
   IdentifierNormal = efjsonType_IDENTIFIER_NORMAL,
   IdentifierEscapeStart = efjsonType_IDENTIFIER_ESCAPE_START,
   IdentifierEscape = efjsonType_IDENTIFIER_ESCAPE,
@@ -137,6 +145,7 @@ enum class TokenType : uint16_t {
   CommentSingleLine = efjsonType_COMMENT_SINGLE_LINE,
   CommentMultiLine = efjsonType_COMMENT_MULTI_LINE,
   CommentMultiLineEnd = efjsonType_COMMENT_MULTI_LINE_END,
+#endif
 };
 enum class Location : uint8_t {
   Root = efjsonLocation_ROOT,
