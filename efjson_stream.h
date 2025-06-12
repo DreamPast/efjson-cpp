@@ -180,6 +180,50 @@ EFJSON_CODE_BEGIN
   #endif
 #endif /* ul_noinline */
 
+/**
+ * @def ul_label_cold
+ * @brief Marks a label as unlikely to be taken.
+ * @example ```c
+ *         int foo(int x) {
+ *           if(x < 0) goto fallback;
+ *           return 0;
+ *         fallback:
+ *           ul_label_cold;
+ *           return 1;
+ *         }
+ *         ```
+ */
+#if !defined(ul_label_cold) && defined(__has_attribute) && !defined(UL_PEDANTIC)
+  #if __has_attribute(cold)
+    #define ul_label_cold __attribute__((cold))
+  #endif
+#endif
+#ifndef ul_label_cold
+  #define ul_label_cold ((void)0)
+#endif
+
+/**
+ * @def ul_label_hot
+ * @brief Marks a label as unlikely to be taken.
+ * @example ```c
+ *         int foo(int x) {
+ *           if(x < 0) goto fallback;
+ *           return 0;
+ *         fallback:
+ *           ul_label_hot;
+ *           return 1;
+ *         }
+ *         ```
+ */
+#if !defined(ul_label_hot) && defined(__has_attribute) && !defined(UL_PEDANTIC)
+  #if __has_attribute(hot)
+    #define ul_label_hot __attribute__((hot))
+  #endif
+#endif
+#ifndef ul_label_hot
+  #define ul_label_hot ((void)0)
+#endif
+
 
 #ifndef EFJSON_PUBLIC
   #define EFJSON_PUBLIC
@@ -1719,7 +1763,7 @@ enum {
    * `substate` and `escape` in `JsonStreamParser`
    *   `STRING_UNICODE`: <substate: 0..=4> the index of the Unicode sequence
    *                     <escape> escaped character
-   * 
+   *
    *   `STRING_UNICODE_NEXT`: <substate: 0..=6> the index of the Unicode sequence (includes '\\u' prefix)
    *                          <escape> escaped character
    *
@@ -1740,7 +1784,7 @@ enum {
    *
    *   `IDENTIFIER_ESCAPE`: <substate: 0..=5> the index of the Unicode sequence (includes 'u' prefix)
    *                        <escape> escaped character
-   * 
+   *
    *   `IDENTIFIER_ESCAPE_NEXT`: <substate: 0..=6> the index of the Unicode sequence (includes '\\u' prefix)
    *                             <escape> escaped character
    */
@@ -1916,7 +1960,7 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
           token->extra = efjsonError_BAD_PROPERTY_NAME_IN_OBJECT;
         }
       }
-      return;
+      break;
     case efjsonLoc__KEY_END:
       if(u == 0x3A /* ':' */) {
         if(ul_likely(parser->location == efjsonLoc__KEY_END)) {
@@ -1925,7 +1969,7 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
         } else if(parser->location == efjsonLoc__VALUE_START) token->extra = efjsonError_REPEATED_COLON;
         else token->extra = efjsonError_WRONG_COLON;
       } else token->extra = efjsonError_EXPECTED_COLON;
-      return;
+      break;
     case efjsonLoc__VALUE_END:
       if(u == 0x2C /* ',' */) {
         parser->location = efjsonLoc__KEY_START;
@@ -1936,7 +1980,7 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
         token->type = efjsonType_OBJECT_END;
       } else if(u == 0x5D /* ']' */) token->extra = efjsonError_WRONG_BRACKET;
       else token->extra = efjsonError_UNEXPECTED;
-      return;
+      break;
     case efjsonLoc__ELEMENT_END:
       if(u == 0x2C /* ',' */) {
         parser->location = efjsonLoc__ELEMENT_START;
@@ -1947,188 +1991,185 @@ EFJSON_PRIVATE void efjsonStreamParser__handleEmpty(efjsonStreamParser* parser, 
         token->type = efjsonType_ARRAY_END;
       } else if(u == 0x7D /* '}' */) token->extra = efjsonError_WRONG_BRACKET;
       else token->extra = efjsonError_UNEXPECTED;
-      return;
+      break;
+
     default:
-      break;
-    }
-
-    switch(u) {
-    case 0x22 /* '"' */:
-      parser->state = efjsonVal__STRING;
-      parser->flag &= ~efjsonFlag__SingleQuote;
-      token->type = efjsonType_STRING_START;
-      break;
-    case 0x27 /* '\'' */:
-  #if EFJSON_CONF_EXTENDED_JSON
-      if(ul_unlikely(parser->option & efjsonOption_SINGLE_QUOTE)) {
+      switch(u) {
+      case 0x22 /* '"' */:
         parser->state = efjsonVal__STRING;
-        parser->flag |= efjsonFlag__SingleQuote;
+        parser->flag &= ~efjsonFlag__SingleQuote;
         token->type = efjsonType_STRING_START;
-      } else
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-        token->extra = efjsonError_SINGLE_QUOTE_FORBIDDEN;
-      break;
-
-    case 0x3A /* ':' */:
-      if(parser->location == efjsonLoc__VALUE_START) token->extra = efjsonError_REPEATED_COLON;
-      else token->extra = efjsonError_WRONG_COLON;
-      break;
-    case 0x2C /* ',' */:
-      if(parser->location == efjsonLoc__ELEMENT_FIRST_START) token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
-      else if(parser->location == efjsonLoc__ELEMENT_START) token->extra = efjsonError_TRAILING_COMMA_FORBIDDEN;
-      else if(parser->location == efjsonLoc__VALUE_START) token->extra = efjsonError_EMPTY_VALUE_IN_OBJECT;
-      else token->extra = efjsonError_UNEXPECTED;
-      break;
-
-    case 0x5D /* ']' */:
-      if(parser->location == efjsonLoc__ELEMENT_FIRST_START) {
-        --parser->len;
-        parser->location = efjson__last(parser);
-        token->type = efjsonType_ARRAY_END;
-      } else if(parser->location == efjsonLoc__ELEMENT_START) {
+        break;
+      case 0x27 /* '\'' */:
   #if EFJSON_CONF_EXTENDED_JSON
-        if(parser->option & efjsonOption_TRAILING_COMMA_IN_ARRAY) {
+        if(ul_unlikely(parser->option & efjsonOption_SINGLE_QUOTE)) {
+          parser->state = efjsonVal__STRING;
+          parser->flag |= efjsonFlag__SingleQuote;
+          token->type = efjsonType_STRING_START;
+        } else
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+          token->extra = efjsonError_SINGLE_QUOTE_FORBIDDEN;
+        break;
+
+      case 0x5D /* ']' */:
+        if(ul_likely(parser->location == efjsonLoc__ELEMENT_FIRST_START)) {
           --parser->len;
           parser->location = efjson__last(parser);
           token->type = efjsonType_ARRAY_END;
-        } else
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-          token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
-      } else {
-        token->extra = efjsonError_WRONG_BRACKET;
-      }
-      break;
-    case 0x7D /* '}' */:
-      if(parser->location == efjsonLoc__KEY_FIRST_START) {
-        --parser->len;
-        parser->location = efjson__last(parser);
-        token->type = efjsonType_OBJECT_END;
-      } else if(ul_likely(parser->location == efjsonLoc__KEY_START)) {
+        } else if(parser->location == efjsonLoc__ELEMENT_START) {
   #if EFJSON_CONF_EXTENDED_JSON
-        if(parser->option & efjsonOption_TRAILING_COMMA_IN_OBJECT) {
+          if(parser->option & efjsonOption_TRAILING_COMMA_IN_ARRAY) {
+            --parser->len;
+            parser->location = efjson__last(parser);
+            token->type = efjsonType_ARRAY_END;
+          } else
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+            token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
+        } else {
+          token->extra = efjsonError_WRONG_BRACKET;
+        }
+        break;
+      case 0x7D /* '}' */:
+        if(parser->location == efjsonLoc__KEY_FIRST_START) {
           --parser->len;
           parser->location = efjson__last(parser);
           token->type = efjsonType_OBJECT_END;
-        } else
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-          token->extra = efjsonError_COMMA_IN_EMPTY_OBJECT;
-      } else {
-        token->extra = efjsonError_WRONG_BRACKET;
-      }
-      break;
-
-    case 0x5B /* '[' */:
-  #if EFJSON_CONF_FIXED_STACK > 0
-      if(ul_unlikely(efjson__stackLen(parser->len) == EFJSON_CONF_FIXED_STACK)) {
-        token->extra = efjsonError_TOO_MANY_RECURSIONS;
-        return;
-      }
-  #else
-      if(ul_unlikely(efjson__stackLen(parser->len) == parser->cap)) {
-        token->extra = efjsonStreamParser__enlarge(parser);
-        if(ul_unlikely(token->extra != 0)) return;
-      }
-  #endif
-      efjson__push(parser, parser->location);
-      parser->location = efjsonLoc__ELEMENT_FIRST_START;
-      token->type = efjsonType_ARRAY_START;
-      break;
-    case 0x7B /* '{' */:
-  #if EFJSON_CONF_FIXED_STACK > 0
-      if(ul_unlikely(efjson__stackLen(parser->len) == EFJSON_CONF_FIXED_STACK)) {
-        token->extra = efjsonError_TOO_MANY_RECURSIONS;
-        return;
-      }
-  #else
-      if(ul_unlikely(efjson__stackLen(parser->len) == parser->cap)) {
-        token->extra = efjsonStreamParser__enlarge(parser);
-        if(ul_unlikely(token->extra != 0)) return;
-      }
-  #endif
-      efjson__push(parser, parser->location);
-      parser->location = efjsonLoc__KEY_FIRST_START;
-      token->type = efjsonType_OBJECT_START;
-      break;
-
-    case 0x2B /* '+' */:
+        } else if(ul_likely(parser->location == efjsonLoc__KEY_START)) {
   #if EFJSON_CONF_EXTENDED_JSON
-      if(!(parser->option & efjsonOption_POSITIVE_SIGN)) {
+          if(parser->option & efjsonOption_TRAILING_COMMA_IN_OBJECT) {
+            --parser->len;
+            parser->location = efjson__last(parser);
+            token->type = efjsonType_OBJECT_END;
+          } else
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+            token->extra = efjsonError_COMMA_IN_EMPTY_OBJECT;
+        } else {
+          token->extra = efjsonError_WRONG_BRACKET;
+        }
+        break;
+
+      case 0x5B /* '[' */:
+  #if EFJSON_CONF_FIXED_STACK > 0
+        if(ul_unlikely(efjson__stackLen(parser->len) == EFJSON_CONF_FIXED_STACK)) {
+          token->extra = efjsonError_TOO_MANY_RECURSIONS;
+          return;
+        }
+  #else
+        if(ul_unlikely(efjson__stackLen(parser->len) == parser->cap)) {
+          token->extra = efjsonStreamParser__enlarge(parser);
+          if(ul_unlikely(token->extra != 0)) return;
+        }
+  #endif
+        efjson__push(parser, parser->location);
+        parser->location = efjsonLoc__ELEMENT_FIRST_START;
+        token->type = efjsonType_ARRAY_START;
+        break;
+      case 0x7B /* '{' */:
+  #if EFJSON_CONF_FIXED_STACK > 0
+        if(ul_unlikely(efjson__stackLen(parser->len) == EFJSON_CONF_FIXED_STACK)) {
+          token->extra = efjsonError_TOO_MANY_RECURSIONS;
+          return;
+        }
+  #else
+        if(ul_unlikely(efjson__stackLen(parser->len) == parser->cap)) {
+          token->extra = efjsonStreamParser__enlarge(parser);
+          if(ul_unlikely(token->extra != 0)) return;
+        }
+  #endif
+        efjson__push(parser, parser->location);
+        parser->location = efjsonLoc__KEY_FIRST_START;
+        token->type = efjsonType_OBJECT_START;
+        break;
+
+      case 0x2B /* '+' */:
+  #if EFJSON_CONF_EXTENDED_JSON
+        if(!(parser->option & efjsonOption_POSITIVE_SIGN)) {
+          token->extra = efjsonError_POSITIVE_SIGN_FORBIDDEN;
+          break;
+        }
+        ul_fallthrough;
+  #else  /* !EFJSON_CONF_EXTENDED_JSON */
         token->extra = efjsonError_POSITIVE_SIGN_FORBIDDEN;
         break;
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+      case 0x2D /* '-' */:
+        parser->state = efjsonVal__NUMBER;
+        parser->substate = efjsonNumberState__ONLY_SIGN;
+        token->type = efjsonType_NUMBER_INTEGER_SIGN;
+        break;
+      case 0x30 /* '0' */:
+      case 0x31 /* '1' */:
+      case 0x32 /* '2' */:
+      case 0x33 /* '3' */:
+      case 0x34 /* '4' */:
+      case 0x35 /* '5' */:
+      case 0x36 /* '6' */:
+      case 0x37 /* '7' */:
+      case 0x38 /* '8' */:
+      case 0x39 /* '9' */:
+        parser->state = efjsonVal__NUMBER;
+        parser->substate = (u != '0');
+        token->type = efjsonType_NUMBER_INTEGER_DIGIT;
+        break;
+      case 0x2E /* '.' */:
+  #if EFJSON_CONF_EXTENDED_JSON
+        if(parser->option & efjsonOption_EMPTY_INTEGER) {
+          parser->state = efjsonVal__NUMBER_FRACTION;
+          parser->substate = efjsonNumberFraction__EMPTY_INTEGER;
+          token->type = efjsonType_NUMBER_FRACTION_START;
+        } else
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+          token->extra = efjsonError_EMPTY_INTEGER_PART;
+        break;
+      case 0x4E /* 'N' */:
+  #if EFJSON_CONF_EXTENDED_JSON
+        if(parser->option & efjsonOption_NAN) {
+          parser->state = efjsonVal__NUMBER_NAN;
+          parser->substate = 1;
+          token->type = efjsonType_NUMBER_NAN;
+        } else
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+          token->extra = efjsonError_UNEXPECTED_IN_NUMBER;
+        break;
+      case 0x49 /* 'I' */:
+  #if EFJSON_CONF_EXTENDED_JSON
+        if(parser->option & efjsonOption_INFINITY) {
+          parser->state = efjsonVal__NUMBER_INFINITY;
+          parser->substate = 1;
+          token->type = efjsonType_NUMBER_INFINITY;
+        } else
+  #endif /* EFJSON_CONF_EXTENDED_JSON */
+          token->extra = efjsonError_UNEXPECTED_IN_NUMBER;
+        break;
+
+      case 0x6E /* 'n' */:
+        parser->state = efjsonVal__NULL;
+        parser->substate = 1;
+        token->type = efjsonType_NULL;
+        break;
+      case 0x74 /* 't' */:
+        parser->state = efjsonVal__TRUE;
+        parser->substate = 1;
+        token->type = efjsonType_TRUE;
+        break;
+      case 0x66 /* 'f' */:
+        parser->state = efjsonVal__FALSE;
+        parser->substate = 1;
+        token->type = efjsonType_FALSE;
+        break;
+
+      default:
+        ul_label_cold;
+        if(ul_unlikely(u == 0x3A /* ':' */)) {
+          if(parser->location == efjsonLoc__VALUE_START) token->extra = efjsonError_REPEATED_COLON;
+          else token->extra = efjsonError_WRONG_COLON;
+        } else if(ul_unlikely(u == 0x2C /* ',' */)) {
+          if(parser->location == efjsonLoc__ELEMENT_FIRST_START) token->extra = efjsonError_COMMA_IN_EMPTY_ARRAY;
+          else if(parser->location == efjsonLoc__ELEMENT_START) token->extra = efjsonError_TRAILING_COMMA_FORBIDDEN;
+          else if(parser->location == efjsonLoc__VALUE_START) token->extra = efjsonError_EMPTY_VALUE_IN_OBJECT;
+          else token->extra = efjsonError_UNEXPECTED;
+        } else token->extra = efjsonError_UNEXPECTED;
       }
-      ul_fallthrough;
-  #else  /* !EFJSON_CONF_EXTENDED_JSON */
-      token->extra = efjsonError_POSITIVE_SIGN_FORBIDDEN;
-      break;
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-    case 0x2D /* '-' */:
-      parser->state = efjsonVal__NUMBER;
-      parser->substate = efjsonNumberState__ONLY_SIGN;
-      token->type = efjsonType_NUMBER_INTEGER_SIGN;
-      break;
-    case 0x30 /* '0' */:
-    case 0x31 /* '1' */:
-    case 0x32 /* '2' */:
-    case 0x33 /* '3' */:
-    case 0x34 /* '4' */:
-    case 0x35 /* '5' */:
-    case 0x36 /* '6' */:
-    case 0x37 /* '7' */:
-    case 0x38 /* '8' */:
-    case 0x39 /* '9' */:
-      parser->state = efjsonVal__NUMBER;
-      parser->substate = (u != '0');
-      token->type = efjsonType_NUMBER_INTEGER_DIGIT;
-      break;
-    case 0x2E /* '.' */:
-  #if EFJSON_CONF_EXTENDED_JSON
-      if(parser->option & efjsonOption_EMPTY_INTEGER) {
-        parser->state = efjsonVal__NUMBER_FRACTION;
-        parser->substate = efjsonNumberFraction__EMPTY_INTEGER;
-        token->type = efjsonType_NUMBER_FRACTION_START;
-      } else
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-        token->extra = efjsonError_EMPTY_INTEGER_PART;
-      break;
-    case 0x4E /* 'N' */:
-  #if EFJSON_CONF_EXTENDED_JSON
-      if(parser->option & efjsonOption_NAN) {
-        parser->state = efjsonVal__NUMBER_NAN;
-        parser->substate = 1;
-        token->type = efjsonType_NUMBER_NAN;
-      } else
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-        token->extra = efjsonError_UNEXPECTED_IN_NUMBER;
-      break;
-    case 0x49 /* 'I' */:
-  #if EFJSON_CONF_EXTENDED_JSON
-      if(parser->option & efjsonOption_INFINITY) {
-        parser->state = efjsonVal__NUMBER_INFINITY;
-        parser->substate = 1;
-        token->type = efjsonType_NUMBER_INFINITY;
-      } else
-  #endif /* EFJSON_CONF_EXTENDED_JSON */
-        token->extra = efjsonError_UNEXPECTED_IN_NUMBER;
-      break;
-
-    case 0x6E /* 'n' */:
-      parser->state = efjsonVal__NULL;
-      parser->substate = 1;
-      token->type = efjsonType_NULL;
-      break;
-    case 0x74 /* 't' */:
-      parser->state = efjsonVal__TRUE;
-      parser->substate = 1;
-      token->type = efjsonType_TRUE;
-      break;
-    case 0x66 /* 'f' */:
-      parser->state = efjsonVal__FALSE;
-      parser->substate = 1;
-      token->type = efjsonType_FALSE;
-      break;
-
-    default:
-      token->extra = efjsonError_UNEXPECTED;
     }
   }
 }
@@ -2259,6 +2300,7 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
         u2 = 0x09 /* '\t' */;
         break;
       default:
+        ul_label_cold;
         break;
       }
   #if EFJSON_CONF_EXTENDED_JSON
@@ -2273,6 +2315,7 @@ EFJSON_PRIVATE efjsonToken efjsonStreamParser__step(efjsonStreamParser* parser, 
           u2 = 0x00 /* '\0' */;
           break;
         default:
+          ul_label_cold;
           break;
         }
   #endif /* EFJSON_CONF_EXTENDED_JSON */
