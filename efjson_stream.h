@@ -524,18 +524,19 @@ typedef struct efjsonToken {
    *
    * | `type`                                  | `index` | `done` | `extra` |
    * | --------------------------------------- | ------- | ------ | ------- |
-   * | `efjsonType_NULL`                       | 0..3    | 0,1    | 0       |
-   * | `efjsonType_FALSE`                      | 0..4    | 0,1    | 0       |
-   * | `efjsonType_TRUE`                       | 0..3    | 0,1    | 0       |
-   * | `efjsonType_NUMBER_INFINITY`            | 0..7    | 0,1    | 0       |
-   * | `efjsonType_NUMBER_NAN`                 | 0..2    | 0,1    | 0       |
+   * | `efjsonType_NULL`                       | 0..=3   | 0,1    | 0       |
+   * | `efjsonType_FALSE`                      | 0..=4   | 0,1    | 0       |
+   * | `efjsonType_TRUE`                       | 0..=3   | 0,1    | 0       |
+   * | `efjsonType_NUMBER_INFINITY`            | 0..=7   | 0,1    | 0       |
+   * | `efjsonType_NUMBER_NAN`                 | 0..=2   | 0,1    | 0       |
    * | `efjsonType_STRING_ESCAPE`              | 0       | 1      | escape  |
-   * | `efjsonType_STRING_ESCAPE_UNICODE` [^1] | 0..4    | 0,1    | escape  |
+   * | `efjsonType_STRING_ESCAPE_UNICODE` [^1] | 0..=3   | 0,1    | escape  |
    * | `efjsonType_STRING_ESCAPE_HEX`          | 0,1     | 0,1    | escape  |
    * | `efjsonType_IDENTIFIER_ESCAPE_START`    | 0,1     | 0,1    | 0       |
-   * | `efjsonType_IDENTIFIER_ESCAPE`          | 0..3    | 0,1    | escape  |
+   * | `efjsonType_IDENTIFIER_ESCAPE` [^2]     | 0..=3   | 0,1    | escape  |
    *
-   * [^1]: If `EFJSON_CONF_COMBINE_ESCAPED_SURROGATE` is set to `1`, the range of `index` will be `0..9`.
+   * [^1]: If `EFJSON_CONF_COMBINE_ESCAPED_SURROGATE` is set to `1`, the range of `index` will be `0..=9`.
+   * [^2]: If `EFJSON_CONF_COMBINE_ESCAPED_SURROGATE` is set to `1`, the range of `index` will be `0..=9`.
    */
   efjsonUint8 type;
   efjsonUint8 dummy_;
@@ -1716,8 +1717,11 @@ enum {
 
   /**
    * `substate` and `escape` in `JsonStreamParser`
-   *   `STRING_UNICODE`: <substate: 0..4> the index of the Unicode sequence
+   *   `STRING_UNICODE`: <substate: 0..=4> the index of the Unicode sequence
    *                     <escape> escaped character
+   * 
+   *   `STRING_UNICODE_NEXT`: <substate: 0..=6> the index of the Unicode sequence (includes '\\u' prefix)
+   *                          <escape> escaped character
    *
    *   `NUMBER`: <substate> `efjsonNumberState__*`
    *
@@ -1725,17 +1729,20 @@ enum {
    *
    *   `NUMBER_EXPONENT`: <substate> `efjsonNumberExponent__*`
    *
-   *   `NULL`/`TRUE`/`FALSE`: <substate: 0..5> current index of string
+   *   `NULL`/`TRUE`/`FALSE`: <substate: 0..=5> current index of string
    *
-   *   `STRING_ESCAPE_HEX`: <substate: 0..2> the index of the Hex sequence
+   *   `STRING_ESCAPE_HEX`: <substate: 0..=2> the index of the Hex sequence
    *                        <escape> escaped character
    *
-   *   `NUMBER_NAN`|`NUMBER_INFINITY`: <substate: 0..8> current index of string
+   *   `NUMBER_NAN`|`NUMBER_INFINITY`: <substate: 0..=8> current index of string
    *
    *   `NUMBER_HEX`|`NUMBER_OCT`|`NUMBER_BIN`: <substate: 0|1> whether already accept digits
    *
-   *   `IDENTIFIER_ESCAPE`: <substate: 0..5> the index of the Unicode sequence (includes 'u' prefix)
+   *   `IDENTIFIER_ESCAPE`: <substate: 0..=5> the index of the Unicode sequence (includes 'u' prefix)
    *                        <escape> escaped character
+   * 
+   *   `IDENTIFIER_ESCAPE_NEXT`: <substate: 0..=6> the index of the Unicode sequence (includes '\\u' prefix)
+   *                             <escape> escaped character
    */
 
   #if !(EFJSON_CONF_FIXED_STACK > 0)
